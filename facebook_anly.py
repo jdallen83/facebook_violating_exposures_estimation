@@ -27,6 +27,8 @@ WVCR_DATA_STR = """
 2023Q4 0.04 0.0004 8.06E+08
 2024Q1 0.03 0.0003 6.21E+08
 2024Q2 0.03 0.0003 6.24E+08
+2024Q3 0.04 0.0004 7.036E+08
+2024Q4 0.05 0.0005 7.736E+08
 """.strip()
 
 # Global users
@@ -85,7 +87,7 @@ def process_cser_data(CSER_FILE, WVCR_DATA):
 
             v = float(tokens[4].replace('"', '').replace('%', ''))
 
-            tag = "{}_{}_{}".format(tokens[0], tokens[1], tokens[3])
+            tag = "{}_{}_{}".format(tokens[0], tokens[1], tokens[3]) # Platform, Policy area, Period
             if tag not in CSER_DATA_D:
                 CSER_DATA_D[tag] = {
                     'app': tokens[0],
@@ -93,6 +95,27 @@ def process_cser_data(CSER_FILE, WVCR_DATA):
                     'period': tokens[3],
                 }
             CSER_DATA_D[tag][tokens[2]] = v
+
+    # Add lines to fill out the upper bound policy areas
+    # Have to do this because they only include the latest period for the upper bound stuff
+    periods = set()
+
+    for tag, d in CSER_DATA_D.items():
+        periods.add(d['period'])
+
+    ubp_policies = {}
+    for tag, d in CSER_DATA_D.items():
+        if 'UBP' in d:
+            for period in periods:
+                if period == d['period']:
+                    continue
+                ntag = "{}_{}_{}".format('Facebook', d['policy_area'], period)
+                nd = dict(d)
+                nd['period'] = period
+                ubp_policies[ntag] = nd
+
+    for tag, d in ubp_policies.items():
+        CSER_DATA_D[tag] = d
 
     return CSER_DATA_D
 
@@ -144,6 +167,9 @@ def estimate_violating_impressions(CSER_DATA_D, WVCR_DATA, ROUNDING_UNCERT=ROUND
         d['estimated_monthly_violating_global_imps'] = d['estimated_violating_global_imps'] / 3.0
         d['estimated_monthly_violating_global_imps_uncert'] = d['estimated_violating_global_imps_uncert'] / 3.0
 
+        # Get percentage uncertainty
+        d['estimated_monthly_violating_imps_uncert_percentage'] = d['estimated_monthly_violating_us_imps_uncert'] / d['estimated_monthly_violating_us_imps'] * 100.0
+
     return CSER_DATA_D
 
 
@@ -173,6 +199,7 @@ def write_estimated_violating_impressions(CSER_DATA_D, OUTFILE):
         'estimated_violating_global_imps_uncert',
         'estimated_monthly_violating_global_imps',
         'estimated_monthly_violating_global_imps_uncert',
+        'estimated_monthly_violating_imps_uncert_percentage',
     ]
     tsv_strings = ["\t".join(COLS)]
 
