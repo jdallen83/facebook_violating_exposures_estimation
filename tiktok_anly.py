@@ -6,9 +6,6 @@ import numpy as np
 
 # Metric,Period type,Period,Policy type,Issue,Task type,Task,Location,Market,Result
 
-INFILE = '/Users/jeff/work/facebook_us_violating_impressions/tiktok/2024Q2_raw_data_cger_English (2).csv'
-INFILE = '/home/jeff/work/ii/analyses/violating_exposures_on_fb/tiktok/2024Q2_raw_data_cger_English (2).csv'
-OUTFILE = '/home/jeff/work/ii/analyses/violating_exposures_on_fb/tiktok/2024Q2_raw_data_cger_English--Violating_exposures.tsv'
 VIEWS_BUCKET_MAP = {
     '0 views': {'l': 0, 'h': 0, 'p': 0},
     '1-10 views': {'l': 0, 'h': 1, 'p': 0.5},
@@ -20,6 +17,8 @@ VIEWS_BUCKET_MAP = {
     '>1,000,000 views': {'l': 6, 'h': 6, 'p': 6},
 }
 PERIODS_MAP = {
+    'Oct-Dec 2024': '2024-Q4',
+    'Jul-Sep 2024': '2024-Q3',
     'Apr-Jun 2024': '2024-Q2',
     'Jan-Mar 2024': '2024-Q1',
     'Oct-Dec 2023': '2023-Q4',
@@ -151,7 +150,11 @@ def period_to_quarter(p):
 
 
 def process_tiktok_data(infile, outfile=None, market=None, period=None):
-    df = pd.read_csv(infile)
+    with open(infile + '__ampersand_fix.csv', 'w') as f:
+        data = open(infile).read().replace(' and ', ' & ')
+        f.write(data)
+
+    df = pd.read_csv(infile + '__ampersand_fix.csv')
     df['quarter'] = df.Period.apply(period_to_quarter)
 
     if market is not None:
@@ -194,15 +197,23 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None):
     policy_map = {}
     for i, r in df_viols.iterrows():
         d = dict(r)
-        if d['Location'] not in policy_map:
-            policy_map[d['Location']] = {'Youth Safety & Well-Being': 0.0}
-        policy_map[d['Location']][d['Issue']] = d['Result']
+        market = d['Market']
+        issue = d['Issue']
+        result = d['Result']
+        period = d['Period']
+        if market not in policy_map:
+            policy_map[market] = {}
+        if period not in policy_map[market]:
+            policy_map[market][period] = {'Youth Safety & Well-Being': 0.0, 'Youth Safety and Well-Being': 0.0}
+
+        policy_map[market][period][issue] = result
+        print("{}\t{}\t{}\t{}".format(market, period, issue, result))
 
     df_viols['Issue_Main'] = df_viols.Issue
     df_viols['Result_Combined'] = df_viols.Result
     df_viols_sub['Issue_Main'] = df_viols_sub.Issue.apply(policy_sub_issue_map)
     df_viols_sub['Result_Combined'] = df_viols_sub.apply(
-        lambda x: x['Result']*policy_map[x['Location']][x['Issue_Main']],
+        lambda x: x['Result']*policy_map[x['Market']][x['Period']][x['Issue_Main']],
         axis=1
     )
 
