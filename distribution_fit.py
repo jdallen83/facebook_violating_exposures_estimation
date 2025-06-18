@@ -3,6 +3,7 @@ import math
 from jplot import jplot as jp
 import numpy as np
 import random
+import json
 
 
 SMALL_FLOAT = 1E-280 # Have to define a minimum float size to round to 0, for division by 0 issues
@@ -95,46 +96,54 @@ def single_bin_estimate(x_low, x_high, func, p, cov, area, area_l, area_h, area_
     views = [10**m for m in means]
     weighted_views = [10**m * ta for ta, m in zip(target_areas, means)]
 
-    return (
-        (x_low+x_high)/2.0,
-        x_low,
-        x_high,
-        float(np.mean(target_areas)),
-        float(np.std(target_areas)),
-        float(np.mean(means)),
-        float(np.std(means)),
-        float(np.mean(weighted_views)),
-        float(np.std(weighted_views)),
-        float(np.mean(views)),
-        float(np.std(views)),
-        xs, bf, bf_l, bf_h, sf, sf_l, sf_h,
-    )
+    return {
+        'bin_id': (x_low+x_high)/2.0,
+        'x_low': x_low,
+        'x_high': x_high,
+        'weight_mean': float(np.mean(target_areas)),
+        'weight_std': float(np.std(target_areas)),
+        'log_views_mean': float(np.mean(means)),
+        'log_views_std': float(np.std(means)),
+        'weighted_views_mean': float(np.mean(weighted_views)),
+        'weighted_views_std': float(np.std(weighted_views)),
+        'views_mean': float(np.mean(views)),
+        'views_std': float(np.std(views)),
+        'fit_curves': {
+            'x': xs,
+            'best_fit': bf,
+            'best_fit_low': bf_l,
+            'best_fit_high': bf_h,
+            'scaled_fit': sf,
+            'scaled_fit_low': sf_l,
+            'scaled_fit_high': sf_h,
+        },
+    }
 
 
-def single_tail_bin_estimate(l, h, func, p, cov, area, area_l, area_h, area_uncert, n=100, n_samples=300, n_extra_bins=1):
-    width = h - l
+def single_tail_bin_estimate(x_low, x_high, func, p, cov, area, area_low, area_high, area_uncert, n=100, n_samples=300, n_extra_bins=1):
+    width = x_high - x_low
     d = 1.0 * width / n
 
-    min_x = l
-    max_x = l + width * (n_extra_bins + 1)
+    min_x = x_low
+    max_x = x_low + width * (n_extra_bins + 1)
     xs_full = np.linspace(min_x, max_x, num=n*(n_extra_bins+1), endpoint=False)
     bf_full = [float(y) for y in func(xs_full, p)]
 
-    target_areas_full = [random.uniform(area_l, area_h) for _ in range(n_samples)] if area_uncert is None else [np.random.normal(area, area_uncert) for _ in range(n_samples)]
+    target_areas_full = [random.uniform(area_low, area_high) for _ in range(n_samples)] if area_uncert is None else [np.random.normal(area, area_uncert) for _ in range(n_samples)]
 
     sampled_ps = [np.random.multivariate_normal(p, cov) for _ in range(n_samples)]
     sampled_ys_full = [func(xs_full, pp) for pp in sampled_ps]
     sampled_areas_full = [sum(ys)*d for ys in sampled_ys_full]
 
-    scale_factors = [ta / sa if sa > SMALL_FLOAT else 0.0 for ta, sa in zip(target_areas_full, sampled_areas_full)]
-    scaled_ys_full = [sf * sy for sf, sy in zip(scale_factors, sampled_ys_full)]
-    scaled_areas_full = [sum(ys)*d for ys in scaled_ys_full]
+    scale_factors = [taf / saf if saf > SMALL_FLOAT else 0.0 for taf, saf in zip(target_areas_full, sampled_areas_full)]
+    scaled_ys_full = [sf * syf for sf, syf in zip(scale_factors, sampled_ys_full)]
+    scaled_areas_full = [sum(ysf)*d for ysf in scaled_ys_full]
 
     bins = []
 
     for ii in range(n_extra_bins+1):
-        ll = l + width * ii
-        hh = h + width * ii
+        ll = x_low + width * ii
+        hh = x_high + width * ii
         i_l = n * ii
         i_h = n * ii + n
         xs = xs_full[i_l:i_h]
@@ -144,7 +153,7 @@ def single_tail_bin_estimate(l, h, func, p, cov, area, area_l, area_h, area_unce
         scaled_ys = [ys[i_l:i_h] for ys in scaled_ys_full]
 
         sampled_areas = [sum(ys)*d for ys in sampled_ys]
-        target_areas = [ta * sa / saf if saf > SMALL_FLOAT else 0.0 for ta, sa, saf in zip(target_areas_full, sampled_areas, sampled_areas_full)]
+        target_areas = [taf * (sa / saf) if saf > SMALL_FLOAT else 0.0 for taf, sa, saf in zip(target_areas_full, sampled_areas, sampled_areas_full)]
 
         mean_ys = [np.mean([sy[i] for sy in sampled_ys]) for i in range(n)]
         std_ys = [np.std([sy[i] for sy in sampled_ys]) for i in range(n)]
@@ -163,27 +172,35 @@ def single_tail_bin_estimate(l, h, func, p, cov, area, area_l, area_h, area_unce
         views = [10**m if m > 0.0 else 0.0 for m in means]
         weighted_views = [10**m * ta if m > 0.0 else 0.0 for m, ta in zip(means, target_areas)]
 
-        bins.append((
-            (ll+hh)/2.0,
-            ll,
-            hh,
-            float(np.mean(target_areas)),
-            float(np.std(target_areas)),
-            float(np.mean(means)),
-            float(np.std(means)),
-            float(np.mean(weighted_views)),
-            float(np.std(weighted_views)),
-            float(np.mean(views)),
-            float(np.std(views)),
-            xs, bf, bf_l, bf_h, sf, sf_l, sf_h,
-        ))
+        bins.append({
+            'bin_id': (ll+hh)/2.0,
+            'x_low': ll,
+            'x_high': hh,
+            'weight_mean': float(np.mean(target_areas)),
+            'weight_std': float(np.std(target_areas)),
+            'log_views_mean': float(np.mean(means)),
+            'log_views_std': float(np.std(means)),
+            'weighted_views_mean': float(np.mean(weighted_views)),
+            'weighted_views_std': float(np.std(weighted_views)),
+            'views_mean': float(np.mean(views)),
+            'views_std': float(np.std(views)),
+            'fit_curves': {
+                'x': xs,
+                'best_fit': bf,
+                'best_fit_low': bf_l,
+                'best_fit_high': bf_h,
+                'scaled_fit': sf,
+                'scaled_fit_low': sf_l,
+                'scaled_fit_high': sf_h,
+            },
+        })
+
 
     return bins
 
 
 def bin_and_curve_estimates(xs, ys, es, p, cov, func, n=100, n_samples=300, n_extra_bins=1):
     width = xs[1] - xs[0]
-    bins = []
     fit_bins = []
 
     xxs = []
@@ -194,7 +211,7 @@ def bin_and_curve_estimates(xs, ys, es, p, cov, func, n=100, n_samples=300, n_ex
     sf_l = []
     sf_h = []
 
-    for i in range(len(xs[:-1])):
+    for i in range(len(xs)-1):
         l = i * width
         h = l + width
 
@@ -205,18 +222,18 @@ def bin_and_curve_estimates(xs, ys, es, p, cov, func, n=100, n_samples=300, n_ex
         y_l = y - e if y - e > 0.0 else 0.0
         y_h = y + e
 
-        b, l, h, weight, weight_uncert, mean, mean_uncert, views_cont, views_cont_uncert, views, views_uncert, cxs, cbf, cbf_l, cbf_h, csf, csf_l, csf_h = single_bin_estimate(l, h, func, p, cov, y, y_l, y_h, None, n=n, n_samples=n_samples)
-        c_bin = (cxs, cbf, cbf_l, cbf_h, csf, csf_l, csf_h)
-        f_bin = (b, l, h, weight, weight_uncert, mean, mean_uncert, views_cont, views_cont_uncert, views, views_uncert)
-        bins.append(c_bin)
-        fit_bins.append(f_bin)
-        xxs += cxs
-        bf += cbf
-        bf_l += cbf_l
-        bf_h += cbf_h
-        sf += csf
-        sf_l += csf_l
-        sf_h += csf_h
+        cur_fit = single_bin_estimate(l, h, func, p, cov, y, y_l, y_h, None, n=n, n_samples=n_samples)
+        cur_curves = cur_fit.pop('fit_curves')
+
+        fit_bins.append(cur_fit)
+
+        xxs += cur_curves['x']
+        bf += cur_curves['best_fit']
+        bf_l += cur_curves['best_fit_low']
+        bf_h += cur_curves['best_fit_high']
+        sf += cur_curves['scaled_fit']
+        sf_l += cur_curves['scaled_fit_low']
+        sf_h += cur_curves['scaled_fit_high']
 
     tail_l = xs[-1] - width / 2.0
     tail_h = xs[-1] + width / 2.0
@@ -226,20 +243,28 @@ def bin_and_curve_estimates(xs, ys, es, p, cov, func, n=100, n_samples=300, n_ex
 
     tail_bins = single_tail_bin_estimate(tail_l, tail_h, func, p, cov, tail_y, tail_y_l, tail_y_h, None, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins)
 
-    for b, l, h, weight, weight_uncert, mean, mean_uncert, views_cont, views_cont_uncert, views, views_uncert, cxs, cbf, cbf_l, cbf_h, csf, csf_l, csf_h in tail_bins:
-        c_bin = (cxs, cbf, cbf_l, cbf_h, csf, csf_l, csf_h)
-        f_bin = (b, l, h, weight, weight_uncert, mean, mean_uncert, views_cont, views_cont_uncert, views, views_uncert)
-        bins.append(c_bin)
-        fit_bins.append(f_bin)
-        xxs += cxs
-        bf += cbf
-        bf_l += cbf_l
-        bf_h += cbf_h
-        sf += csf
-        sf_l += csf_l
-        sf_h += csf_h
+    for fit in tail_bins:
+        cur_curves = fit.pop('fit_curves')
+        fit_bins.append(fit)
 
-    return fit_bins, xxs, bf, bf_l, bf_h, sf, sf_l, sf_h
+        xxs += cur_curves['x']
+        bf += cur_curves['best_fit']
+        bf_l += cur_curves['best_fit_low']
+        bf_h += cur_curves['best_fit_high']
+        sf += cur_curves['scaled_fit']
+        sf_l += cur_curves['scaled_fit_low']
+        sf_h += cur_curves['scaled_fit_high']
+
+    curves = {
+        'x': xxs,
+        'best_fit': bf,
+        'best_fit_low': bf_l,
+        'best_fit_high': bf_h,
+        'scaled_fit': sf,
+        'scaled_fit_low': sf_l,
+        'scaled_fit_high': sf_h,
+    }
+    return fit_bins, curves
 
 
 def chi2_fit(func, x, y, e, p):
@@ -248,6 +273,54 @@ def chi2_fit(func, x, y, e, p):
     res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
     cov = hess_inv * res_variance
     return fit, cov
+
+
+def min_mid_max_views(xs, ys):
+    width = xs[1] - xs[0]
+
+    cur_area = sum([y * width for y in ys])
+    ysn = [y / cur_area for y in ys]
+
+    min_sum = 0.0
+    max_sum = 0.0
+    mid_sum = 0.0
+    for x, y in zip(xs, ysn):
+        l = x - width / 2.0
+        h = x + width / 2.0
+
+        min_sum += 10**l * y * width
+        max_sum += 10**h * y * width
+        mid_sum += 10**x * y * width
+
+    return min_sum, mid_sum, max_sum
+
+
+def sample_min_max_views(xs, ys, es, n=1000):
+    width = xs[1] - xs[0]
+
+    min_sum, mid_sum, max_sum = min_mid_max_views(xs, ys)
+
+    mins = []
+    maxs = []
+    mids = []
+    for _ in range(n):
+        ys_samp = [random.uniform(y-e if y-e > 0.0 else 0.0, y+e) for y, e in zip(ys, es)]
+        cur_min, cur_mid, cur_max = min_mid_max_views(xs, ys_samp)
+        mins.append(cur_min)
+        maxs.append(cur_max)
+        mids.append(cur_mid)
+
+    return {
+        'min_est': min_sum,
+        'min_est_avg': float(np.mean(mins)),
+        'min_est_std': float(np.std(mins)),
+        'mid_est': mid_sum,
+        'mid_est_avg': float(np.mean(mids)),
+        'mid_est_std': float(np.std(mids)),
+        'max_est': max_sum,
+        'max_est_avg': float(np.mean(maxs)),
+        'max_est_std': float(np.std(maxs)),
+    }
 
 
 def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1):
@@ -285,63 +358,34 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     fit_p, fit_cov = chi2_fit(func_fit, xs, fit_ys, fit_es, p0)
     fit_uncert = np.sqrt(np.diag(fit_cov))
 
-    fit_bins, xs_bf, bf, bf_l, bf_h, sf, sf_l, sf_h = bin_and_curve_estimates(xs, ys, es, fit_p, fit_cov, func, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins)
+    fit_bins, curves = bin_and_curve_estimates(xs, ys, es, fit_p, fit_cov, func, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins)
 
-    total_views = sum([v for b,l,h,w,we,m,me,v,ve,vc,vce in fit_bins])
-    total_view_errors = [ve for b,l,h,w,we,m,me,v,ve,vc,vce in fit_bins]
+    total_views = sum([fb['weighted_views_mean'] for fb in fit_bins])
+    total_view_errors = [fb['weighted_views_std'] for fb in fit_bins]
     total_view_uncert = math.sqrt(sum([e*e for e in total_view_errors]))
 
-    return total_views, total_view_uncert, fit_bins, fit_p, fit_cov, fit_uncert, (xs_bf, bf, bf_l, bf_h, xs_bf, sf, sf_l, sf_h)
+    sampled_min_max = sample_min_max_views(xs, ys, es, n=n)
 
+    return {
+        'estimated_views': total_views,
+        'estimated_views_uncert': total_view_uncert,
 
-def get_min_max_views(xs, ys, es, n=1000):
-    d = xs[1] - xs[0]
+        'min_views': sampled_min_max['min_est'],
+        'min_views_avg': sampled_min_max['min_est_avg'],
+        'min_views_uncert': sampled_min_max['min_est_std'],
+        'mid_views': sampled_min_max['mid_est'],
+        'mid_views_avg': sampled_min_max['mid_est_avg'],
+        'mid_views_uncert': sampled_min_max['mid_est_std'],
+        'max_views': sampled_min_max['max_est'],
+        'max_views_avg': sampled_min_max['max_est_avg'],
+        'max_views_uncert': sampled_min_max['max_est_std'],
 
-    cur_area = sum([y * d for y in ys])
-    ysn = [y / cur_area for y in ys]
-
-    min_sum = 0.0
-    max_sum = 0.0
-    mid_sum = 0.0
-    for x, y in zip(xs, ysn):
-        l = x - d / 2.0
-        h = x + d / 2.0
-
-        min_sum += 10**l * y * d
-        max_sum += 10**h * y * d
-        mid_sum += 10**x * y * d
-
-    mins = []
-    maxs = []
-    mids = []
-    for _ in range(n):
-        ys_samp = [random.uniform(y-e if y-e > 0.0 else 0.0, y+e) for y, e in zip(ys, es)]
-        cur_area = sum([y * d for y in ys_samp])
-        ysn = [y / cur_area for y in ys_samp]
-
-        cur_min_sum = 0.0
-        cur_max_sum = 0.0
-        cur_mid_sum = 0.0
-        for x, y in zip(xs, ysn):
-            l = x - d / 2.0
-            h = x + d / 2.0
-
-            cur_min_sum += 10**l * y * d
-            cur_max_sum += 10**h * y * d
-            cur_mid_sum += 10**x * y * d
-        mins.append(cur_min_sum)
-        maxs.append(cur_max_sum)
-        mids.append(cur_mid_sum)
-
-    min_avg, min_std = (float(np.mean(mins)), float(np.std(mins)))
-    max_avg, max_std = (float(np.mean(maxs)), float(np.std(maxs)))
-    mid_avg, mid_std = (float(np.mean(mids)), float(np.std(mids)))
-
-    return (
-        (min_sum, min_avg, min_std),
-        (mid_sum, mid_avg, mid_std),
-        (max_sum, max_avg, max_std),
-    )
+        'fit_parameters': [float(p) for p in fit_p],
+        'fit_covariance': [[float(p) for p in fc] for fc in fit_cov],
+        'fit_uncertainty': [float(p) for p in fit_uncert],
+        'fit_bins': fit_bins,
+        'curves': curves,
+    }
 
 
 xs = [
@@ -498,14 +542,39 @@ print(xs)
 print(ys)
 print(es)
 
-##
-total_views, total_view_uncert, fit_bins, fit_p, fit_cov, fit_uncert, (xs_bf, bf, bf_l, bf_h, x_s, bf_s, bf_s_l, bf_s_h) = estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=10000, n_extra_bins=1)
+
+fit = estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=20000, n_extra_bins=1)
+fit_bins = fit.pop('fit_bins')
+curves = fit.pop('curves')
+total_views = fit['estimated_views']
+total_views_uncert = fit['estimated_views_uncert']
 
 ##
 
-print(total_views, total_view_uncert)
-print(fit_p)
-print(fit_uncert)
+for k, v in fit.items():
+    print("{}: {}".format(k, v))
+
+##
+
+print(xs)
+print(ys, sum(ys))
+print(es)
+
+##
+for fb in fit_bins:
+    print("{}\t{}\t{}\t{}".format("%3.1f" % fb['bin_id'], "%3.8f" % fb['weight_mean'], fb['weighted_views_mean'], fb['weighted_views_std']))
+##
+
+##
+jp.plot_fit_with_uncert(xs, ys, es, curves['x'], curves['best_fit'], curves['best_fit_low'], curves['best_fit_high'], show=True, bar=True)
+##
+jp.plot_fit_with_uncert(xs, ys, es, curves['x'], curves['scaled_fit'], curves['scaled_fit_low'], curves['scaled_fit_high'], show=True, bar=True)
+##
+jp.plot_fit_with_uncert(xs, ys, es, xs_bf, bf_s, bf_s, bf_s, show=True, bar=True)
+##
+
+
+print(curves['x'])
 
 ##
 for fb in fit_bins:
