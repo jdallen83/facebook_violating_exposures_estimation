@@ -4,6 +4,8 @@ import pandas as pd
 from scipy.interpolate import CubicSpline
 import numpy as np
 
+import facebook_violating_exposures_estimation.distribution_fit as distribution_fit
+
 
 VIEWS_BUCKET_MAP = {
     '0 views': {'l': 0, 'h': 0, 'p': 0},
@@ -103,7 +105,7 @@ def process_histo(df_histo, method='linear'):
     return view_histo
 
 
-def get_average_views(df_histo, method='linear'):
+def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None):
     view_histo = process_histo(df_histo, method=method)
 
     low_limit = 0.0
@@ -123,19 +125,45 @@ def get_average_views(df_histo, method='linear'):
         mid_est += 10**v['p'] * v['v']
         estimate += 10**v['mean_views'] * v['v']
 
+    histo_x_bins = []
+    histo_y_bins = []
+    histo_e_bins = []
+    zero_frac = 0.0
+    for i, r in df_histo.iterrows():
+        rd = dict(r)
+        task = rd['name']
+        bucket = VIEWS_BUCKET_MAP[task]
+        if bucket['p']==0:
+            zero_frac = float(rd['pct'])
+        else:
+            histo_x_bins.append(bucket['p'])
+            histo_y_bins.append(float(rd['pct']))
+            histo_e_bins.append(0.00005)
+    fit = distribution_fit.estimate_views_from_discrete_distribution(histo_x_bins, histo_y_bins, histo_e_bins, n=200, n_samples=50000, n_extra_bins=1, zero_frac=zero_frac)
+    if plot_dir is not None:
+        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
+        histo_filetag = os.path.join(plot_dir, histo_filetag)
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
+
     return {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
         'middle_estimate': mid_est,
-        'estimate': estimate,
+        'full_range_lower_bound': fit['dist_total_min_views_with_0'],
+        'full_range_upper_bound': fit['dist_total_max_views_with_0'],
+        'estimated_views_per_video': fit['estimated_views_with_0'],
+        'estimated_views_per_video_uncertainty': fit['estimated_views_uncert_with_0'],
         'lower_bound_non0': low_limit / non_0_s,
         'upper_bound_non0': high_limit / non_0_s,
         'middle_estimate_non0': mid_est / non_0_s,
-        'estimate_non0': estimate / non_0_s,
+        'full_range_lower_bound_non0': fit['dist_total_min_views'],
+        'full_range_upper_bound_non0': fit['dist_total_max_views'],
+        'estimated_views_per_video_non0': fit['estimated_views'],
+        'estimated_views_per_video_non0_uncertainty': fit['estimated_views_uncert'],
     }
 
 
-def process_youtube_data(infile, outfile):
+def process_youtube_data(infile, outfile, plot_dir=None):
     df = pd.read_csv(infile, sep='\t')
 
     df_hist = df[df['name'].isin(VIEWS_BUCKET_MAP.keys())].copy()
@@ -150,7 +178,7 @@ def process_youtube_data(infile, outfile):
         if not len(df_histo_mp):
             print("Warning: No valid views historgram found for", market, period, "so won't have data then...")
             continue
-        avg_views = get_average_views(df_histo_mp)
+        avg_views = get_average_views(df_histo_mp, plot_dir=plot_dir, histo_label="YouTube [{}, All Violations, All Regions]".format(quarter.upper()))
         avg_views['quarter'] = quarter
         quarterly_views_data[quarter] = avg_views
 
@@ -216,6 +244,7 @@ def process_youtube_data(infile, outfile):
     df_out['monthly_lower_bound_exposures'] = df_out.lower_bound * df_out.violation_videos_removed / 3.0
     df_out['monthly_upper_bound_exposures'] = df_out.upper_bound * df_out.violation_videos_removed / 3.0
     df_out['monthly_estimate_exposures'] = df_out.estimate * df_out.violation_videos_removed / 3.0
+    df_out['monthly_estimate_exposures_uncertainty'] = df_out.estimate_uncertainty * df_out.violation_videos_removed / 3.0
     df_out['monthly_middle_estimate_exposures'] = df_out.middle_estimate * df_out.violation_videos_removed / 3.0
 
     df_out = df_out[[
@@ -224,16 +253,22 @@ def process_youtube_data(infile, outfile):
         'violation',
         'violation_videos_removed',
         'total_videos_removed_for_quarter',
+        'monthly_estimate_exposures',
+        'monthly_estimate_exposures_uncertainty',
+        'estimate',
+        'estimate_uncertainty',
         'monthly_lower_bound_exposures',
         'monthly_upper_bound_exposures',
-        'monthly_estimate_exposures',
         'monthly_middle_estimate_exposures',
         'lower_bound',
         'upper_bound',
+        'full_range_lower_bound',
+        'full_range_upper_bound',
         'middle_estimate',
-        'estimate',
         'lower_bound_non0',
         'upper_bound_non0',
+        'full_range_lower_bound_non0',
+        'full_range_upper_bound_non0',
         'middle_estimate_non0',
         'estimate_non0',
     ]]
@@ -247,12 +282,13 @@ def process_youtube_data(infile, outfile):
 if __name__=='__main__':
     import sys
 
-    if len(sys.argv)!=3:
+    if len(sys.argv)!=4:
         print("Usage: python youtube_anly.py [Path to extracted YouTube data csv file] [Path to desired output file]")
         sys.exit()
 
     cger_infile = sys.argv[1]
     outfile = sys.argv[2]
+    plots_dir = sys.argv[3]
 
     if not os.path.isfile(cger_infile):
         print("Provided path the csv file", cger_infile, "is not found.")
@@ -262,4 +298,8 @@ if __name__=='__main__':
         print("Provided output file", outfile, "exists. Will not overwrite.")
         sys.exit()
 
-    df_violating_exposures = process_youtube_data(cger_infile, outfile)
+    if not os.path.isdir(plots_dir):
+        print("Plot directory needs to exist and be a directory")
+        sys.exit()
+
+    df_violating_exposures = process_youtube_data(cger_infile, outfile, plot_dir=plots_dir)

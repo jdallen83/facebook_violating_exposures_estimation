@@ -641,7 +641,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylim=[0.0, None],
         style=style,
         show=False,
-        save="{}_Scaled_Fit.png".format(filetag),
+        save="{}_Modeled_Fit.png".format(filetag),
     )
     plot.plot([
         ('bar', xs, wvses2x, {'color': 'tab:orange', 'width': 0.85, 'bottom': wvs_l, 'label': 'Model', 'alpha': 0.6})
