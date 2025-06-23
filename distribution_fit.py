@@ -1,6 +1,6 @@
 import scipy as sp
 import math
-from jplot import jplot as jp
+from facebook_violating_exposures_estimation import plot as plot
 import numpy as np
 import random
 import json
@@ -66,6 +66,11 @@ def single_bin_estimate(x_low, x_high, func, p, cov, area, area_l, area_h, area_
 
     width = x_high - x_low
     d = 1.0 * width / n
+    if area is None and area_l is not None and area_h is not None:
+        area = 0.5 * (area_l + area_h)
+    if area_l is None and area_h is None and area is not None and area_uncert is not None:
+        area_l = area - area_uncert if area - area_uncert > 0.0 else 0.0
+        area_h = area + area_uncert
 
     xs = np.linspace(x_low, x_high, num=n, endpoint=False)
     bf = [float(y) for y in func(xs, p)]
@@ -96,6 +101,17 @@ def single_bin_estimate(x_low, x_high, func, p, cov, area, area_l, area_h, area_
     views = [10**m for m in means]
     weighted_views = [10**m * ta for ta, m in zip(target_areas, means)]
 
+    bf_mean = sum([x*y for x, y in zip(xs, bf)]) / sum(bf)
+    views_bf = 10**bf_mean * d * sum(bf)
+    views_bf_l = 10**bf_mean * d * sum(bf_l)
+    views_bf_h = 10**bf_mean * d * sum(bf_h)
+
+    views_data_l = 10**x_low * area
+    views_data_h = 10**x_high * area
+    views_data_ll = 10**x_low * area_l
+    views_data_hh = 10**x_high * area_h
+    views_data_mid = 10**(0.5*(x_low + x_high)) * area
+
     return {
         'bin_id': (x_low+x_high)/2.0,
         'x_low': x_low,
@@ -108,6 +124,15 @@ def single_bin_estimate(x_low, x_high, func, p, cov, area, area_l, area_h, area_
         'weighted_views_std': float(np.std(weighted_views)),
         'views_mean': float(np.mean(views)),
         'views_std': float(np.std(views)),
+        'log_views_mean_best_fit': bf_mean,
+        'views_best_fit': views_bf,
+        'views_best_fit_low': views_bf_l,
+        'views_best_fit_high': views_bf_h,
+        'views_data_low': views_data_l,
+        'views_data_min': views_data_ll,
+        'views_data_mid': views_data_mid,
+        'views_data_high': views_data_h,
+        'views_data_max': views_data_hh,
         'fit_curves': {
             'x': xs,
             'best_fit': bf,
@@ -123,6 +148,11 @@ def single_bin_estimate(x_low, x_high, func, p, cov, area, area_l, area_h, area_
 def single_tail_bin_estimate(x_low, x_high, func, p, cov, area, area_low, area_high, area_uncert, n=100, n_samples=300, n_extra_bins=1):
     width = x_high - x_low
     d = 1.0 * width / n
+    if area is None and area_low is not None and area_high is not None:
+        area = 0.5 * (area_low + area_high)
+    if area_low is None and area_high is None and area is not None and area_uncert is not None:
+        area_low = area - area_uncert if area - area_uncert > 0.0 else 0.0
+        area_high = area + area_uncert
 
     min_x = x_low
     max_x = x_low + width * (n_extra_bins + 1)
@@ -172,6 +202,24 @@ def single_tail_bin_estimate(x_low, x_high, func, p, cov, area, area_low, area_h
         views = [10**m if m > 0.0 else 0.0 for m in means]
         weighted_views = [10**m * ta if m > 0.0 else 0.0 for m, ta in zip(means, target_areas)]
 
+        bf_mean = sum([x*y for x, y in zip(xs, bf)]) / sum(bf)
+        views_bf = 10**bf_mean * d * sum(bf)
+        views_bf_l = 10**bf_mean * d * sum(bf_l)
+        views_bf_h = 10**bf_mean * d * sum(bf_h)
+
+        if ii==0:
+            views_data_l = 10**x_low * area
+            views_data_h = 10**x_high * area
+            views_data_ll = 10**x_low * area_low
+            views_data_hh = 10**x_high * area_high
+            views_data_mid = 10**(0.5*(x_low + x_high)) * area
+        else:
+            views_data_l = 0.0
+            views_data_h = 0.0
+            views_data_ll = 0.0
+            views_data_hh = 0.0
+            views_data_mid = 0.0
+
         bins.append({
             'bin_id': (ll+hh)/2.0,
             'x_low': ll,
@@ -184,6 +232,16 @@ def single_tail_bin_estimate(x_low, x_high, func, p, cov, area, area_low, area_h
             'weighted_views_std': float(np.std(weighted_views)),
             'views_mean': float(np.mean(views)),
             'views_std': float(np.std(views)),
+
+            'views_best_fit': views_bf,
+            'views_best_fit_low': views_bf_l,
+            'views_best_fit_high': views_bf_h,
+            'views_data_low': views_data_l,
+            'views_data_min': views_data_ll,
+            'views_data_mid': views_data_mid,
+            'views_data_high': views_data_h,
+            'views_data_max': views_data_hh,
+
             'fit_curves': {
                 'x': xs,
                 'best_fit': bf,
@@ -304,7 +362,8 @@ def sample_min_max_views(xs, ys, es, n=1000):
     maxs = []
     mids = []
     for _ in range(n):
-        ys_samp = [random.uniform(y-e if y-e > 0.0 else 0.0, y+e) for y, e in zip(ys, es)]
+        ys_samp = [random.uniform(y-e, y+e) for y, e in zip(ys, es)]
+        ys_samp = [y if y > 0.0 else 0.0 for y in ys_samp]
         cur_min, cur_mid, cur_max = min_mid_max_views(xs, ys_samp)
         mins.append(cur_min)
         maxs.append(cur_max)
@@ -323,7 +382,89 @@ def sample_min_max_views(xs, ys, es, n=1000):
     }
 
 
-def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1):
+def rough_min_max_views(xs, ys, es):
+    width = xs[1] - xs[0]
+    d = width / 2.0
+
+    area = sum(ys) * width
+    ys = [y / area for y in ys]
+    es = [e / area for e in es]
+
+    ls = [x-d for x in xs]
+    hs = [x+d for x in xs]
+
+    ys_maxed = list(ys)
+    error_to_dist = es[-1]
+    ys_maxed[-1] = ys_maxed[-1] + es[-1]
+    i = 0
+    while error_to_dist > 0:
+        if error_to_dist < es[i]:
+            ys_maxed[i] = ys_maxed[i] - error_to_dist
+            error_to_dist = 0.0
+        else:
+            ys_maxed[i] = ys_maxed[i] - es[i]
+            error_to_dist = error_to_dist - es[i]
+        i += 1
+
+    ys_min = list(ys)
+    error_to_remove = es[-1]
+    i = -1
+    while error_to_remove > 0.0:
+        if error_to_remove <= es[i]:
+            ys_min[i] = ys_min[i] - error_to_remove
+            if ys_min[i] < 0.0:
+                error_to_remove = ys_min[i] * -1
+                ys_min[i] = 0.0
+            else:
+                error_to_remove = 0.0
+        else:
+            ys_min[i] = ys_min[i] - es[i]
+            if ys_min[i] < 0.0:
+                error_to_remove = error_to_remove - es[i] - ys_min[i]
+                ys_min[i] = 0.0
+            else:
+                error_to_remove = error_to_remove - es[i]
+        i -= 1
+
+    i = 0
+    error_to_dist = es[-1]
+    while error_to_dist > 0.0:
+        if error_to_dist <= es[i]:
+            ys_min[i] = ys_min[i] + error_to_dist
+            error_to_dist = 0.0
+        else:
+            ys_min[i] = ys_min[i] + es[i]
+            error_to_dist = error_to_dist - es[i]
+        i += 1
+
+    area_min = sum(ys_min) * width
+    ys_min = [y / area_min for y in ys_min]
+    area_max = sum(ys_maxed) * width
+    ys_maxed = [y / area_max for y in ys_maxed]
+
+
+    mid = sum([10**x * width * y for x, y in zip(xs, ys)])
+
+    binning_min = sum([10**x * width * y for x, y in zip(ls, ys)])
+    binning_max = sum([10**x * width * y for x, y in zip(hs, ys)])
+
+    rounding_min = sum([10**x * width * y for x, y in zip(xs, ys_min)])
+    rounding_max = sum([10**x * width * y for x, y in zip(xs, ys_maxed)])
+
+    total_min = sum([10**x * width * y for x, y in zip(ls, ys_min)])
+    total_max = sum([10**x * width * y for x, y in zip(hs, ys_maxed)])
+
+    return {
+        'dist_mid_views': mid,
+        'dist_binning_min_views': binning_min,
+        'dist_binning_max_views': binning_max,
+        'dist_rounding_min_views': rounding_min,
+        'dist_rounding_max_views': rounding_max,
+        'dist_total_min_views': total_min,
+        'dist_total_max_views': total_max,
+    }
+
+def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1, zero_frac=None):
     # Important to make sure the distribution is properly normalized
     # Meaning, area is 1.0. So sum(y*d) = 1.0
     d = xs[1] - xs[0]
@@ -365,8 +506,9 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     total_view_uncert = math.sqrt(sum([e*e for e in total_view_errors]))
 
     sampled_min_max = sample_min_max_views(xs, ys, es, n=n)
+    min_max_views = rough_min_max_views(xs, ys, es)
 
-    return {
+    r = {
         'estimated_views': total_views,
         'estimated_views_uncert': total_view_uncert,
 
@@ -387,332 +529,177 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
         'curves': curves,
     }
 
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-ys = [
-    11/100.0,
-    11/100.0,
-    6/100.0,
-    2/100.0,
-    1/100.0,
-]
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-ys = [
-    24/100.0,
-    8/100.0,
-    5/100.0,
-    2/100.0,
-    0/100.0,
-]
-
-es = [0.5/100.0 for y in ys]
-
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-cs = [
-    2395918,
-    895363,
-    611703,
-    244250,
-    120142,
-]
-
-total_counts = sum(cs)
-
-ys = [c * 1.0 / total_counts for c in cs]
-es = [math.sqrt(c) / total_counts for c in cs]
-
-
-# TikTok
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-    5.5,
-    6.5,
-]
-
-ys = [
-    1.6,
-    7.8,
-    5.5,
-    1.0,
-    0.5,
-    0.2,
-    0.0,
-]
-
-es = [0.05 for y in ys]
-ys = [y/100.0 for y in ys]
-es = [e/100.0 for e in es]
-
-
-
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-cs = [
-    2395918,
-    895363,
-    611703,
-    244250,
-    120142,
-]
-
-total_counts = sum(cs)
-
-ys = [c * 1.0 / total_counts for c in cs]
-es = [math.sqrt(c) / total_counts for c in cs]
-
-
-
-ys = [
-    11/100.0,
-    11/100.0,
-    6/100.0,
-    2/100.0,
-    1/100.0,
-]
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-ys = [
-    24/100.0,
-    8/100.0,
-    5/100.0,
-    2/100.0,
-    0/100.0,
-]
-
-ys = [
-    16/100.0,
-    7/100.0,
-    4/100.0,
-    2/100.0,
-    0/100.0,
-]
-
-
-es = [0.5/100.0 for y in ys]
-
-
-
-
-
-area = sum(ys) * (xs[1]-xs[0])
-ys = [y / area for y in ys]
-es = [e / area for e in es]
-print(xs)
-print(ys)
-print(es)
-
-
-fit = estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=20000, n_extra_bins=1)
-fit_bins = fit.pop('fit_bins')
-curves = fit.pop('curves')
-total_views = fit['estimated_views']
-total_views_uncert = fit['estimated_views_uncert']
-
-##
-
-for k, v in fit.items():
-    print("{}: {}".format(k, v))
-
-##
-
-print(xs)
-print(ys, sum(ys))
-print(es)
-
-##
-for fb in fit_bins:
-    print("{}\t{}\t{}\t{}".format("%3.1f" % fb['bin_id'], "%3.8f" % fb['weight_mean'], fb['weighted_views_mean'], fb['weighted_views_std']))
-##
-
-##
-jp.plot_fit_with_uncert(xs, ys, es, curves['x'], curves['best_fit'], curves['best_fit_low'], curves['best_fit_high'], show=True, bar=True)
-##
-jp.plot_fit_with_uncert(xs, ys, es, curves['x'], curves['scaled_fit'], curves['scaled_fit_low'], curves['scaled_fit_high'], show=True, bar=True)
-##
-jp.plot_fit_with_uncert(xs, ys, es, xs_bf, bf_s, bf_s, bf_s, show=True, bar=True)
-##
-
-
-print(curves['x'])
-
-##
-for fb in fit_bins:
-    rnd_b = [float("%.8f" % b) for b in fb[:-2]]
-    print("\t".join("{}".format(b) for b in rnd_b))
-##
-print(total_views, total_view_uncert)
-print(sum([b[3] for b in fit_bins]))
-print(sum(ys))
-print(fit_p)
-##
-
-u = -3.0
-s = 2.35
-print(u, s)
-samps = [s for s in np.random.normal(u, s, size=10000000) if s >= 0.0]
-views = np.array([round(10**s) for s in samps if int(10**s)>0])
-
-n_bins = 5
-bin_width = 1.0
-
-sampled_dist = []
-xs_example = []
-for i in range(n_bins):
-    xs_example.append(i * bin_width + bin_width/2.0)
-    sampled_dist.append(0)
-
-for v in views:
-    assigned = False
-    s = math.log10(v)
-    for i, x in enumerate(xs_example):
-        if s >= x - bin_width/2.0 and s < x + bin_width/2.0:
-            assigned = True
-            sampled_dist[i] += 1
-    if not assigned:
-        sampled_dist[-1] += 1
-
-area = sum(sampled_dist) * bin_width
-
-normed_dist = [1.0 * s / area for s in sampled_dist]
-normed_dist_error = [math.sqrt(max([s, 10])) / area for s in sampled_dist]
-rounded_dist = [round(s, 2) for s in normed_dist]
-es_example = [max([0.005, e]) for e in normed_dist_error]
-
-print(np.mean(samps), np.std(samps))
-print(min(samps), max(samps))
-print(np.mean(views), np.std(views))
-print(sampled_dist)
-print(xs_example)
-print(normed_dist)
-print(rounded_dist, sum(rounded_dist))
-print(es_example)
-
-xs = xs_example
-ys = rounded_dist
-es = es_example
-##
-print(xs)
-print(ys)
-print(es)
-
-print(sum(ys) * bin_width)
-total_views, total_view_uncert, fit_bins, fit_p, fit_cov, fit_uncert, (xs_bf, bf, bf_l, bf_h, x_s, bf_s, bf_s_l, bf_s_h) = estimate_views_from_discrete_distribution(xs, ys, es, n=200, n_samples=5000, n_extra_bins=7)
-
-
-##
-
-print(total_views, total_view_uncert)
-print(fit_p)
-print(fit_uncert)
-
-##
-
-ys = [y / 2.0 for y in ys]
-##
-print(sum(ys) * bin_width)
-##
-jp.plot_fit_with_uncert(xs, ys, es, xs_bf, bf_s, bf_s_l, bf_s_h, show=True, bar=True)
-##
-jp.plot_fit_with_uncert(xs, ys, es, xs_bf, bf, bf_l, bf_h, show=True, bar=True)
-##
-jp.plot_fit_with_uncert(xs, ys, es, xs_bf, bf_s, bf_s, bf_s, show=True, bar=True)
-##
-
-for fb in fit_bins:
-    print(fb[:-2])
-##
-
-
-xs = [
-    0.5,
-    1.5,
-    2.5,
-    3.5,
-    4.5,
-]
-
-cs = [
-    2395918,
-    895363,
-    611703,
-    244250,
-    120142,
-]
-
-total_counts = sum(cs)
-
-ys = [c * 1.0 / total_counts for c in cs]
-es = [math.sqrt(c) / total_counts for c in cs]
-
-
-
-total_views, total_view_uncert, fit_bins, fit_p, fit_cov, fit_uncert, \
-    (xs_bf, bf, bf_l, bf_h, x_s, bf_s, bf_s_l, bf_s_h) \
-    = estimate_views_from_discrete_distribution(xs, ys, es, n=200, n_samples=5000, n_extra_bins=2)
-fit_views = total_views
-fit_views_uncert = total_view_uncert
-
-fits = []
-for i in range(20):
-    sampled_ys = [
-        random.uniform(y-e if y-e > 0.0 else 0.0, y+e) for y, e in zip(ys, es)
+    r.update(min_max_views)
+
+    estimates = {
+        'Binning Uncertainty': (r['dist_binning_min_views'], r['dist_mid_views'], r['dist_binning_max_views']),
+        'Rounding Uncertainty': (r['dist_rounding_min_views'], r['dist_mid_views'], r['dist_rounding_max_views']),
+        'Total Uncertainty': (r['dist_total_min_views'], r['dist_mid_views'], r['dist_total_max_views']),
+        'Sampled Variance': (r['min_views']-r['min_views_uncert'], r['mid_views_avg'], r['max_views']+r['max_views_uncert']),
+        'Modeled': (r['estimated_views'] - r['estimated_views_uncert'], r['estimated_views'], r['estimated_views'] + r['estimated_views_uncert']),
+    }
+    r['estimates'] = estimates
+
+    if zero_frac is not None:
+        nzf = 1.0 - zero_frac
+        rr = {"{}_with_0".format(k): v * nzf for k, v in r.items() if '_views' in k}
+        fit_bins_with_0 = []
+        for fb in r['fit_bins']:
+            fbw0 = dict(fb)
+            for k in ('weight_mean', 'weight_std', 'weighted_views_mean', 'weighted_views_std', 'views_data_low', 'views_data_high', 'views_data_min', 'views_data_max'):
+                fbw0[k] = fbw0[k] * nzf
+            fit_bins_with_0.append(fbw0)
+        rr['fit_bins_with_0'] = fit_bins_with_0
+        rr['curves_with_0'] = {
+            'x': r['curves']['x'],
+            'best_fit': [y*nzf for y in r['curves']['best_fit']],
+            'best_fit_low': [y*nzf for y in r['curves']['best_fit_low']],
+            'best_fit_high': [y*nzf for y in r['curves']['best_fit_high']],
+            'scaled_fit': [y*nzf for y in r['curves']['scaled_fit']],
+            'scaled_fit_low': [y*nzf for y in r['curves']['scaled_fit_low']],
+            'scaled_fit_high': [y*nzf for y in r['curves']['scaled_fit_high']],
+        }
+        rr['estimates_with_0'] = dict([
+            (k, [vv * nzf for vv in v]) for k, v in r['estimates'].items()
+        ])
+        r.update(rr)
+
+
+    return r
+
+
+def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, filetag, label=None):
+    fit = {
+        'fit_bins': fit_bins,
+        'curves': curves,
+        'estimates': estimates,
+    }
+    if label is None:
+        label = filetag.split('/')[-1].strip()
+
+    estimates_uncert = {k: (v[1], (v[1]-v[0], v[2]-v[1])) for k, v in estimates.items()}
+
+    xs = [fb['bin_id'] for fb in fit['fit_bins']]
+    ys = [fb['weight_mean'] for fb in fit['fit_bins']]
+    es = [fb['weight_std'] for fb in fit['fit_bins']]
+    es2x = [2*fb['weight_std'] for fb in fit['fit_bins']]
+    ys_l = [fb['weight_mean']-fb['weight_std'] for fb in fit['fit_bins']]
+    ys_l = [y if y>0.0 else 0.0 for y in ys_l]
+    ys_h = [fb['weight_mean']+fb['weight_std'] for fb in fit['fit_bins']]
+
+    wvses2x = [fb['weighted_views_std']*2 for fb in fit['fit_bins']]
+    wvs = [fb['weighted_views_mean'] for fb in fit['fit_bins']]
+    wvs_l = [fb['weighted_views_mean']-fb['weighted_views_std'] for fb in fit['fit_bins']]
+    wvs_l = [wv if wv>0.0 else 0.0 for wv in wvs_l]
+    wvs_h = [fb['weighted_views_mean']+fb['weighted_views_std'] for fb in fit['fit_bins']]
+
+    bfvs_l = [f['views_best_fit_low'] for f in fit['fit_bins']]
+    bfvs_h = [f['views_best_fit_high'] for f in fit['fit_bins']]
+    dvs_l = [f['views_data_low'] for f in fit['fit_bins']]
+    dvs_h = [f['views_data_high'] for f in fit['fit_bins']]
+    dvs_ll = [f['views_data_min'] for f in fit['fit_bins']]
+    dvs_hh = [f['views_data_max'] for f in fit['fit_bins']]
+
+    x_dvs = list(xs)
+    while dvs_h[-1]==0.0:
+        dvs_h = dvs_h[:-1]
+        dvs_l = dvs_l[:-1]
+        x_dvs = x_dvs[:-1]
+    x_dvsmm = list(xs)
+    while dvs_hh[-1]==0.0:
+        dvs_hh = dvs_hh[:-1]
+        dvs_ll = dvs_ll[:-1]
+        x_dvsmm = x_dvsmm[:-1]
+
+    curves = fit['curves']
+
+    plot.plot([
+        ('bar', xs, ys, {'color': 'tab:blue', 'width': 0.9, 'label': 'Provided Data', 'alpha': 0.6}),
+        ('fill_between', curves['x'], curves['best_fit_low'], curves['best_fit_high'], {'alpha': 0.60, 'color': 'tab:orange', 'label': None}),
+        ('plot', curves['x'], curves['best_fit'], {'color': 'tab:orange', 'label': 'Best Fit'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'yerr': es, 'marker': 'o', 'linestyle': ''}),
+        ],
+        title="Best Fit Views Distribution [{}]".format(label),
+        xlabel="Log10(Views)",
+        ylabel="Distribution (a.u.)",
+        xlim=[0.0, None],
+        ylim=[0.0, None],
+        show=False,
+        save="{}_Best_Fit.png".format(filetag),
+    )
+    plot.plot([
+        ('bar', xs, ys, {'color': 'tab:blue', 'width': 0.9, 'label': 'Provided Data', 'alpha': 0.6}),
+        ('fill_between', curves['x'], curves['scaled_fit_low'], curves['scaled_fit_high'], {'alpha': 0.60, 'color': 'tab:orange', 'label': None}),
+        ('plot', curves['x'], curves['scaled_fit'], {'color': 'tab:orange', 'label': 'Best Fit'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'yerr': es, 'marker': 'o', 'linestyle': ''}),
+        ],
+        title="Modeled Views Distribution [{}]".format(label),
+        xlabel="Log10(Views)",
+        ylabel="Distribution (a.u.)",
+        xlim=[0.0, None],
+        ylim=[0.0, None],
+        show=False,
+        save="{}_Scaled_Fit.png".format(filetag),
+    )
+    plot.plot([
+        ('bar', xs, wvses2x, {'color': 'tab:orange', 'width': 0.85, 'bottom': wvs_l, 'label': 'Model', 'alpha': 0.6})
+        ],
+        title="Views Per Bin [{}]".format(label),
+        xlabel="Log10(Views) Bin",
+        ylabel="Views",
+        xlim=[0.0, None],
+        ylim=[0.0, None],
+        show=False,
+        save="{}_Modeled_Views_Per_Bin.png".format(filetag),
+    )
+    plot.plot([
+        ('fill_between', xs, bfvs_l, bfvs_h, {'color': 'tab:orange', 'alpha': 0.5, 'label': 'Best Fit'}),
+        ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),],
+        title="Views Per Bin [{}]".format(label),
+        xlabel="Log10(Views) Bin",
+        ylabel="Views",
+        xlim=[0.0, None],
+        ylim=[0.0, None],
+        show=False,
+        save="{}_Best_Fit_Views_Per_Bin.png".format(filetag),
+    )
+    plot.plot([
+        ('fill_between', x_dvsmm, dvs_ll, dvs_hh, {'color': 'tab:blue', 'alpha': 0.3, 'label': 'Max Data Range'}),
+        ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),
+        ('plot', xs, wvs, {'color': 'tab:orange', 'label': 'Model', 'marker': 'o', 'linestyle': '-'}),
+        ],
+        title="Views Per Bin [{}]".format(label),
+        xlabel="Log10(Views) Bin",
+        ylabel="Views",
+        xlim=[0.0, None],
+        ylim=[0.0, None],
+        show=False,
+        save="{}_Modeled_Data_Views_Per_Bin.png".format(filetag),
+    )
+
+    estimates_uncert_pairs = list(estimates_uncert.items())
+    estimates_xs = [i+1 for i in range(len(estimates_uncert_pairs))]
+    estimates_labels = [k for k, b in estimates_uncert_pairs]
+    estimates_ys = [v[0] for k, v in estimates_uncert_pairs]
+    estimates_ebs = [[v[1][0] for k, v in estimates_uncert_pairs], [v[1][1] for k, v in estimates_uncert_pairs]]
+
+    models_i = [i for i, l in enumerate(estimates_labels) if 'modeled' in l.lower()]
+    models_xs = [x for i, x in enumerate(estimates_xs) if i in models_i]
+    models_labels = [x for i, x in enumerate(estimates_labels) if i in models_i]
+    models_ys = [x for i, x in enumerate(estimates_ys) if i in models_i]
+    models_ebs = [
+        [e for i, e in enumerate(estimates_ebs[0]) if i in models_i],
+        [e for i, e in enumerate(estimates_ebs[1]) if i in models_i],
     ]
-    area = sum(sampled_ys) * (xs[1]-xs[0])
-    sampled_ys = [y / area for y in sampled_ys]
-    sampled_es = [e / area for e in es]
 
-    total_views, total_view_uncert, fit_bins, fit_p, fit_cov, fit_uncert, \
-        (xs_bf, bf, bf_l, bf_h, x_s, bf_s, bf_s_l, bf_s_h) \
-        = estimate_views_from_discrete_distribution(xs, sampled_ys, sampled_es, n=200, n_samples=5000, n_extra_bins=2)
-    print(round(total_views, 2), round(total_view_uncert, 2), fit_p, round(total_views*0.39, 2), round(total_view_uncert*0.39, 2))
-
-    fits.append(total_views)
-#
-print(fit_views, fit_views_uncert)
-print(float(np.mean(fits)), float(np.std(fits)))
-min_est, mid_est, max_est = get_min_max_views(xs, ys, es)
-
-print(min_est)
-print(mid_est)
-print(max_est)
+    markers = ['o' if 'modeled' in l.lower() else '' for l in estimates_labels]
+    plot.plot([
+        ('errorbar', estimates_ys, estimates_xs, {'color': 'tab:blue', 'marker': '', 'capsize': 2, 'linestyle': '', 'xerr': estimates_ebs, 'label': 'Data Limits'}),
+        ('errorbar', models_ys, models_xs, {'color': 'tab:orange', 'marker': 'o', 'capsize': 2, 'linestyle': '', 'xerr': models_ebs, 'label': 'Modeled'}),
+    ],
+    xlabel="Views",
+    ylabel="Estimate Type",
+    yticks={'ticks': estimates_xs, 'labels': estimates_labels},
+    title="Estimated Views Per Video [{}]".format(label),
+    show=False,
+    save="{}_View_Estimates.png".format(filetag))
