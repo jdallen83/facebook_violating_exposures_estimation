@@ -568,7 +568,7 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     return r
 
 
-def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, filetag, label=None):
+def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, filetag, label=None, style=None):
     fit = {
         'fit_bins': fit_bins,
         'curves': curves,
@@ -624,6 +624,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylabel="Distribution (a.u.)",
         xlim=[0.0, None],
         ylim=[0.0, None],
+        style=style,
         show=False,
         save="{}_Best_Fit.png".format(filetag),
     )
@@ -638,6 +639,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylabel="Distribution (a.u.)",
         xlim=[0.0, None],
         ylim=[0.0, None],
+        style=style,
         show=False,
         save="{}_Scaled_Fit.png".format(filetag),
     )
@@ -649,6 +651,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylabel="Views",
         xlim=[0.0, None],
         ylim=[0.0, None],
+        style=style,
         show=False,
         save="{}_Modeled_Views_Per_Bin.png".format(filetag),
     )
@@ -660,6 +663,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylabel="Views",
         xlim=[0.0, None],
         ylim=[0.0, None],
+        style=style,
         show=False,
         save="{}_Best_Fit_Views_Per_Bin.png".format(filetag),
     )
@@ -673,6 +677,7 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         ylabel="Views",
         xlim=[0.0, None],
         ylim=[0.0, None],
+        style=style,
         show=False,
         save="{}_Modeled_Data_Views_Per_Bin.png".format(filetag),
     )
@@ -696,10 +701,12 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
     plot.plot([
         ('errorbar', estimates_ys, estimates_xs, {'color': 'tab:blue', 'marker': '', 'capsize': 2, 'linestyle': '', 'xerr': estimates_ebs, 'label': 'Data Limits'}),
         ('errorbar', models_ys, models_xs, {'color': 'tab:orange', 'marker': 'o', 'capsize': 2, 'linestyle': '', 'xerr': models_ebs, 'label': 'Modeled'}),
-    ],
-    xlabel="Views",
-    ylabel="Estimate Type",
-    yticks={'ticks': estimates_xs, 'labels': estimates_labels},
-    title="Estimated Views Per Video [{}]".format(label),
-    show=False,
-    save="{}_View_Estimates.png".format(filetag))
+        ],
+        xlabel="Views",
+        ylabel="Estimate Type",
+        yticks={'ticks': estimates_xs, 'labels': estimates_labels},
+        title="Estimated Views Per Video [{}]".format(label),
+        style=style,
+        show=False,
+        save="{}_View_Estimates.png".format(filetag)
+    )
