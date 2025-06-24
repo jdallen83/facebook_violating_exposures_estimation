@@ -243,8 +243,8 @@ def process_youtube_data(infile, outfile, plot_dir=None):
 
     df_out['monthly_lower_bound_exposures'] = df_out.lower_bound * df_out.violation_videos_removed / 3.0
     df_out['monthly_upper_bound_exposures'] = df_out.upper_bound * df_out.violation_videos_removed / 3.0
-    df_out['monthly_estimate_exposures'] = df_out.estimate * df_out.violation_videos_removed / 3.0
-    df_out['monthly_estimate_exposures_uncertainty'] = df_out.estimate_uncertainty * df_out.violation_videos_removed / 3.0
+    df_out['monthly_estimated_exposures'] = df_out.estimated_views_per_video * df_out.violation_videos_removed / 3.0
+    df_out['monthly_estimated_exposures_uncertainty'] = df_out.estimated_views_per_video_uncertainty * df_out.violation_videos_removed / 3.0
     df_out['monthly_middle_estimate_exposures'] = df_out.middle_estimate * df_out.violation_videos_removed / 3.0
 
     df_out = df_out[[
@@ -253,10 +253,10 @@ def process_youtube_data(infile, outfile, plot_dir=None):
         'violation',
         'violation_videos_removed',
         'total_videos_removed_for_quarter',
-        'monthly_estimate_exposures',
-        'monthly_estimate_exposures_uncertainty',
-        'estimate',
-        'estimate_uncertainty',
+        'monthly_estimated_exposures',
+        'monthly_estimated_exposures_uncertainty',
+        'estimated_views_per_video',
+        'estimated_views_per_video_uncertainty',
         'monthly_lower_bound_exposures',
         'monthly_upper_bound_exposures',
         'monthly_middle_estimate_exposures',

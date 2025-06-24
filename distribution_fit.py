@@ -467,6 +467,16 @@ def rough_min_max_views(xs, ys, es):
 def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1, zero_frac=None):
     # Important to make sure the distribution is properly normalized
     # Meaning, area is 1.0. So sum(y*d) = 1.0
+    h = list(zip(xs, ys, es))
+    h = sorted(h, key=lambda x: x[0])
+    xs = [x for x, y, e in h]
+    ys = [y for x, y, e in h]
+    es = [e for x, y, e in h]
+
+    print(xs)
+    print(ys)
+    print(es)
+
     d = xs[1] - xs[0]
     cur_area = sum([y * d for y in ys])
     ys = [y / cur_area for y in ys]

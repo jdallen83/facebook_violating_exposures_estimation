@@ -4,7 +4,12 @@ import pandas as pd
 from scipy.interpolate import CubicSpline
 import numpy as np
 
+import facebook_violating_exposures_estimation.distribution_fit as distribution_fit
+
+
+# TikTok data file columns
 # Metric,Period type,Period,Policy type,Issue,Task type,Task,Location,Market,Result
+
 
 VIEWS_BUCKET_MAP = {
     '0 views': {'l': 0, 'h': 0, 'p': 0},
@@ -89,7 +94,39 @@ def process_histo(df_histo, method='linear'):
     return view_histo
 
 
-def get_average_views(df_histo, method='linear'):
+#def get_average_views(df_histo, method='linear'):
+#    view_histo = process_histo(df_histo, method=method)
+
+#    low_limit = 0.0
+#    high_limit = 0.0
+#    mid_est = 0.0
+#    estimate = 0.0
+#    non_0_s = 0.0
+#    for v in view_histo:
+#        if v['p']==0:
+#            continue
+#        if v['v']==0:
+#            continue
+#        non_0_s += v['v']
+
+#        low_limit += 10**v['l'] * v['v']
+#        high_limit += 10**v['h'] * v['v']
+#        mid_est += 10**v['p'] * v['v']
+#        estimate += 10**v['mean_views'] * v['v']
+
+#    return {
+#        'lower_bound': low_limit,
+#        'upper_bound': high_limit,
+#        'middle_estimate': mid_est,
+#        'estimate': estimate,
+#        'lower_bound_non0': low_limit / non_0_s,
+#        'upper_bound_non0': high_limit / non_0_s,
+#        'middle_estimate_non0': mid_est / non_0_s,
+#        'estimate_non0': estimate / non_0_s,
+#    }
+
+
+def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None):
     view_histo = process_histo(df_histo, method=method)
 
     low_limit = 0.0
@@ -109,15 +146,43 @@ def get_average_views(df_histo, method='linear'):
         mid_est += 10**v['p'] * v['v']
         estimate += 10**v['mean_views'] * v['v']
 
+    histo_x_bins = []
+    histo_y_bins = []
+    histo_e_bins = []
+    zero_frac = 0.0
+    for i, r in df_histo.iterrows():
+        rd = dict(r)
+        task = rd['Task']
+        bucket = VIEWS_BUCKET_MAP[task]
+        if bucket['p']==0:
+            zero_frac = float(rd['Result'])
+        else:
+            histo_x_bins.append(bucket['p'] if bucket['p']!=6 else 6.5)
+            histo_y_bins.append(float(rd['Result']))
+            histo_e_bins.append(0.0005)
+
+    fit = distribution_fit.estimate_views_from_discrete_distribution(histo_x_bins, histo_y_bins, histo_e_bins, n=200, n_samples=30000, n_extra_bins=1, zero_frac=zero_frac)
+    if plot_dir is not None:
+        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
+        histo_filetag = os.path.join(plot_dir, histo_filetag)
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
+
+    print("DBGESTS\t", estimate, fit['estimated_views_with_0'], fit['estimated_views_uncert_with_0'])
     return {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
         'middle_estimate': mid_est,
-        'estimate': estimate,
+        'full_range_lower_bound': fit['dist_total_min_views_with_0'],
+        'full_range_upper_bound': fit['dist_total_max_views_with_0'],
+        'estimated_views_per_video': fit['estimated_views_with_0'],
+        'estimated_views_per_video_uncertainty': fit['estimated_views_uncert_with_0'],
         'lower_bound_non0': low_limit / non_0_s,
         'upper_bound_non0': high_limit / non_0_s,
         'middle_estimate_non0': mid_est / non_0_s,
-        'estimate_non0': estimate / non_0_s,
+        'full_range_lower_bound_non0': fit['dist_total_min_views'],
+        'full_range_upper_bound_non0': fit['dist_total_max_views'],
+        'estimated_views_per_video_non0': fit['estimated_views'],
+        'estimated_views_per_video_non0_uncertainty': fit['estimated_views_uncert'],
     }
 
 
@@ -149,7 +214,7 @@ def period_to_quarter(p):
     return "{}{}".format(y, q)
 
 
-def process_tiktok_data(infile, outfile=None, market=None, period=None):
+def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir=None):
     with open(infile + '__ampersand_fix.csv', 'w') as f:
         data = open(infile).read().replace(' and ', ' & ')
         f.write(data)
@@ -171,12 +236,19 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None):
 
     views_data = []
     for market in markets:
+        if market != 'All':
+            continue
         for period in periods:
             df_histo_mp = df_hist[(df_hist.Market==market)&(df_hist.Period==period)].copy()
             if not len(df_histo_mp):
                 print("Warning: No valid views historgram found for", market, period, "so won't have data then...")
                 continue
-            avg_views = get_average_views(df_histo_mp)
+            print('TikTok [{}, All Violations, {} Region]'.format(period.upper(), market))
+            avg_views = get_average_views(
+                df_histo_mp,
+                plot_dir=plot_dir,
+                histo_label='TikTok [{}, All Violations, {} Region]'.format(period.upper(), market),
+            )
             avg_views['Market'] = market
             avg_views['Period'] = period
             views_data.append(avg_views)
@@ -228,12 +300,14 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None):
     df_viols['monthly_exposures_lower_bound'] = df_viols.lower_bound * df_viols.monthly_issue_videos_removed / 3.0
     df_viols['monthly_exposures_upper_bound'] = df_viols.upper_bound * df_viols.monthly_issue_videos_removed / 3.0
     df_viols['monthly_exposures_middle_estimate'] = df_viols.middle_estimate * df_viols.monthly_issue_videos_removed / 3.0
-    df_viols['monthly_exposures_estimate'] = df_viols.estimate * df_viols.monthly_issue_videos_removed / 3.0
+    df_viols['monthly_exposures_estimate'] = df_viols.estimated_views_per_video * df_viols.monthly_issue_videos_removed / 3.0
+    df_viols['monthly_exposures_estimate_uncertainty'] = df_viols.estimated_views_per_video_uncertainty * df_viols.monthly_issue_videos_removed / 3.0
 
     df_viols['monthly_exposures_lower_bound_non0_corrected'] = df_viols.lower_bound_non0 * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
     df_viols['monthly_exposures_upper_bound_non0_corrected'] = df_viols.upper_bound_non0 * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
     df_viols['monthly_exposures_middle_estimate_non0_corrected'] = df_viols.middle_estimate_non0 * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
-    df_viols['monthly_exposures_estimate_non0_corrected'] = df_viols.estimate_non0 * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
+    df_viols['monthly_exposures_estimate_non0_corrected'] = df_viols.estimated_views_per_video_non0 * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
+    df_viols['monthly_exposures_estimate_non0_corrected_uncertainty'] = df_viols.estimated_views_per_video_non0_uncertainty * df_viols.monthly_issue_videos_removed * (1.0-df_viols.Result_Removal_rate_before_any_views) / 3.0
 
     df_viols.rename(columns={'Result': 'Result_Category_share', 'Result_Combined': 'Result_Category_share_overall', 'Issue_Main': 'Issue_Primary_Category'}, inplace=True)
     df_viols.sort_values(by=['Market', 'Policy type', 'Issue_Primary_Category', 'Issue', 'quarter'], inplace=True)
@@ -247,12 +321,13 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None):
 if __name__=='__main__':
     import sys
 
-    if len(sys.argv)!=3:
+    if len(sys.argv)!=4:
         print("Usage: python tiktok_anly.py [Path to CSER csv file] [Path to desired output file]")
         sys.exit()
 
     cger_infile = sys.argv[1]
     outfile = sys.argv[2]
+    plot_dir = sys.argv[3]
 
     if not os.path.isfile(cger_infile):
         print("Provided path the CGER csv file", cger_infile, "is not found.")
@@ -262,4 +337,4 @@ if __name__=='__main__':
         print("Provided output file", outfile, "exists. Will not overwrite.")
         sys.exit()
 
-    df_violating_exposures = process_tiktok_data(cger_infile, outfile)
+    df_violating_exposures = process_tiktok_data(cger_infile, outfile, plot_dir=plot_dir)
