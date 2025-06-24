@@ -94,38 +94,6 @@ def process_histo(df_histo, method='linear'):
     return view_histo
 
 
-#def get_average_views(df_histo, method='linear'):
-#    view_histo = process_histo(df_histo, method=method)
-
-#    low_limit = 0.0
-#    high_limit = 0.0
-#    mid_est = 0.0
-#    estimate = 0.0
-#    non_0_s = 0.0
-#    for v in view_histo:
-#        if v['p']==0:
-#            continue
-#        if v['v']==0:
-#            continue
-#        non_0_s += v['v']
-
-#        low_limit += 10**v['l'] * v['v']
-#        high_limit += 10**v['h'] * v['v']
-#        mid_est += 10**v['p'] * v['v']
-#        estimate += 10**v['mean_views'] * v['v']
-
-#    return {
-#        'lower_bound': low_limit,
-#        'upper_bound': high_limit,
-#        'middle_estimate': mid_est,
-#        'estimate': estimate,
-#        'lower_bound_non0': low_limit / non_0_s,
-#        'upper_bound_non0': high_limit / non_0_s,
-#        'middle_estimate_non0': mid_est / non_0_s,
-#        'estimate_non0': estimate / non_0_s,
-#    }
-
-
 def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None):
     view_histo = process_histo(df_histo, method=method)
 
@@ -236,7 +204,7 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
 
     views_data = []
     for market in markets:
-        if market != 'All':
+        if market != 'Yemen':
             continue
         for period in periods:
             df_histo_mp = df_hist[(df_hist.Market==market)&(df_hist.Period==period)].copy()
@@ -261,7 +229,6 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
     df_0view_removal_rate = df[(df.Metric=='Removal rate before any views') & (df['Task type']=='All')].copy()[['Market', 'Period', 'Issue', 'Result']]
     # Removal rate before any views from the market level histogram
     df_0view_removal_rate_histogram = df[(df['Task type']=='Share of total removals') & (df.Task=='0 views')].copy()[['Market', 'Period', 'Result']]
-    print(df_0view_removal_rate_histogram)
 
     df_viols = df[(df.Metric=='Category share') & (df.Task=='All') & (df['Policy type']=='Policy')].copy()
     df_viols_sub = df[(df.Metric=='Category share') & (df.Task=='All') & (df['Policy type']=='Sub-policy')].copy()
@@ -279,7 +246,7 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
             policy_map[market][period] = {'Youth Safety & Well-Being': 0.0, 'Youth Safety and Well-Being': 0.0}
 
         policy_map[market][period][issue] = result
-        print("{}\t{}\t{}\t{}".format(market, period, issue, result))
+        #print("{}\t{}\t{}\t{}".format(market, period, issue, result))
 
     df_viols['Issue_Main'] = df_viols.Issue
     df_viols['Result_Combined'] = df_viols.Result

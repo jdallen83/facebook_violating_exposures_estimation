@@ -473,10 +473,6 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     ys = [y for x, y, e in h]
     es = [e for x, y, e in h]
 
-    print(xs)
-    print(ys)
-    print(es)
-
     d = xs[1] - xs[0]
     cur_area = sum([y * d for y in ys])
     ys = [y / cur_area for y in ys]
