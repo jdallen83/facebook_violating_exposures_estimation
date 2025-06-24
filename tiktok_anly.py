@@ -3,6 +3,7 @@ import os
 import pandas as pd
 from scipy.interpolate import CubicSpline
 import numpy as np
+import json
 
 import facebook_violating_exposures_estimation.distribution_fit as distribution_fit
 
@@ -22,6 +23,7 @@ VIEWS_BUCKET_MAP = {
     '>1,000,000 views': {'l': 6, 'h': 6, 'p': 6},
 }
 PERIODS_MAP = {
+    'Jan-Mar 2025': '2025-Q1',
     'Oct-Dec 2024': '2024-Q4',
     'Jul-Sep 2024': '2024-Q3',
     'Apr-Jun 2024': '2024-Q2',
@@ -136,7 +138,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
 
     print("DBGESTS\t", estimate, fit['estimated_views_with_0'], fit['estimated_views_uncert_with_0'])
-    return {
+    r = {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
         'middle_estimate': mid_est,
@@ -152,6 +154,10 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         'estimated_views_per_video_non0': fit['estimated_views'],
         'estimated_views_per_video_non0_uncertainty': fit['estimated_views_uncert'],
     }
+    fit['returned_data'] = r
+    fit['spline_estimate'] = estimate
+    json.dump(fit, open(histo_filetag + '__fitdata.json', 'w'), indent=2)
+    return r
 
 
 def policy_sub_issue_map(p):
@@ -211,7 +217,10 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
             if not len(df_histo_mp):
                 print("Warning: No valid views historgram found for", market, period, "so won't have data then...")
                 continue
-            print('TikTok [{}, All Violations, {} Region]'.format(period.upper(), market))
+            if len(df_histo_mp) <= 4:
+                print("Warning: Not enough data points for histogram for", market, period, "so won't have data then...")
+                continue
+            print('TikTok [{}, All Violations, {} Region]'.format(PERIODS_MAP[period], market))
             avg_views = get_average_views(
                 df_histo_mp,
                 plot_dir=plot_dir,
