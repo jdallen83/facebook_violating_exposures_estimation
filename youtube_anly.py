@@ -276,7 +276,8 @@ def process_youtube_data(infile, outfile, plot_dir=None):
         'full_range_lower_bound_non0',
         'full_range_upper_bound_non0',
         'middle_estimate_non0',
-        'estimate_non0',
+        'estimated_views_per_video_non0',
+        'estimated_views_per_video_non0_uncertainty',
     ]]
 
     df_out.sort_values(['country', 'violation', 'quarter'], inplace=True)
