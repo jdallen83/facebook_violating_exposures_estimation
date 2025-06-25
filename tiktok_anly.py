@@ -137,7 +137,6 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
 
-    print("DBGESTS\t", estimate, fit['estimated_views_with_0'], fit['estimated_views_uncert_with_0'])
     r = {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
@@ -210,8 +209,6 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
 
     views_data = []
     for market in markets:
-        if market != 'Yemen':
-            continue
         for period in periods:
             df_histo_mp = df_hist[(df_hist.Market==market)&(df_hist.Period==period)].copy()
             if not len(df_histo_mp):
@@ -255,7 +252,6 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
             policy_map[market][period] = {'Youth Safety & Well-Being': 0.0, 'Youth Safety and Well-Being': 0.0}
 
         policy_map[market][period][issue] = result
-        #print("{}\t{}\t{}\t{}".format(market, period, issue, result))
 
     df_viols['Issue_Main'] = df_viols.Issue
     df_viols['Result_Combined'] = df_viols.Result
