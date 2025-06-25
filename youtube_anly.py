@@ -3,6 +3,7 @@ import os
 import pandas as pd
 from scipy.interpolate import CubicSpline
 import numpy as np
+import json
 
 import facebook_violating_exposures_estimation.distribution_fit as distribution_fit
 
@@ -145,7 +146,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
 
-    return {
+    r = {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
         'middle_estimate': mid_est,
@@ -161,6 +162,11 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         'estimated_views_per_video_non0': fit['estimated_views'],
         'estimated_views_per_video_non0_uncertainty': fit['estimated_views_uncert'],
     }
+    fit['returned_data'] = r
+    fit['spline_estimate'] = estimate
+    json.dump(fit, open(histo_filetag + '__fitdata.json', 'w'), indent=2)
+
+    return r
 
 
 def process_youtube_data(infile, outfile, plot_dir=None):

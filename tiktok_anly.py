@@ -221,7 +221,7 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
             avg_views = get_average_views(
                 df_histo_mp,
                 plot_dir=plot_dir,
-                histo_label='TikTok [{}, All Violations, {} Region]'.format(period.upper(), market),
+                histo_label='TikTok [{}, All Violations, {} Region]'.format(PERIODS_MAP[period], market),
             )
             avg_views['Market'] = market
             avg_views['Period'] = period
