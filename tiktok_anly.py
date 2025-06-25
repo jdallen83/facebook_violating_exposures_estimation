@@ -23,12 +23,12 @@ VIEWS_BUCKET_MAP = {
     '>1,000,000 views': {'l': 6, 'h': 6, 'p': 6},
 }
 PERIODS_MAP = {
-    'Jan-Mar 2025': '2025-Q1',
-    'Oct-Dec 2024': '2024-Q4',
-    'Jul-Sep 2024': '2024-Q3',
-    'Apr-Jun 2024': '2024-Q2',
-    'Jan-Mar 2024': '2024-Q1',
-    'Oct-Dec 2023': '2023-Q4',
+    'Jan-Mar 2025': '2025Q1',
+    'Oct-Dec 2024': '2024Q4',
+    'Jul-Sep 2024': '2024Q3',
+    'Apr-Jun 2024': '2024Q2',
+    'Jan-Mar 2024': '2024Q1',
+    'Oct-Dec 2023': '2023Q4',
 }
 
 
