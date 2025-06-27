@@ -164,6 +164,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
     }
     fit['returned_data'] = r
     fit['spline_estimate'] = estimate
+    fit['histo_bins'] = {'x': histo_x_bins, 'y': histo_y_bins, 'e': histo_e_bins, 'zero_frac': zero_frac}
     json.dump(fit, open(histo_filetag + '__fitdata.json', 'w'), indent=2)
 
     return r
