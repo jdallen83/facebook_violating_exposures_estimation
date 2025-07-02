@@ -9,6 +9,12 @@ import json
 SMALL_FLOAT = 1E-280 # Have to define a minimum float size to round to 0, for division by 0 issues
 
 
+P0_POLYNOMIAL_DISTRIBUTION = [ 0.89947529, -0.71328327 , 0.20253727, -0.01896431]
+def polynomial_distribution(x, p):
+    y = p[3] * x**3 + p[2] * x**2 + p[1] * x + p[0]
+    return np.maximum(y, 0.0)
+
+
 def normal_distribution(x, p):
     # p = [u, s, n]
     return p[2] / (p[1]*np.sqrt(2.0 * math.pi)) * np.exp(-1.0 * (x - p[0])**2 / (2.0 * p[1]**2))
@@ -202,7 +208,7 @@ def single_tail_bin_estimate(x_low, x_high, func, p, cov, area, area_low, area_h
         views = [10**m if m > 0.0 else 0.0 for m in means]
         weighted_views = [10**m * ta if m > 0.0 else 0.0 for m, ta in zip(means, target_areas)]
 
-        bf_mean = sum([x*y for x, y in zip(xs, bf)]) / sum(bf)
+        bf_mean = sum([x*y for x, y in zip(xs, bf)]) / sum(bf) if sum(bf) > 0.0 else xs[0]
         views_bf = 10**bf_mean * d * sum(bf)
         views_bf_l = 10**bf_mean * d * sum(bf_l)
         views_bf_h = 10**bf_mean * d * sum(bf_h)
@@ -329,6 +335,8 @@ def chi2_fit(func, x, y, e, p):
     error_func = lambda p, x, y, e: (func(x, p) - y) / e
     fit, hess_inv, infodict, errmsg, success = sp.optimize.leastsq(error_func, p, args=(np.array(x), np.array(y), np.array(e)), full_output=1)
     res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
+
+    print(fit, hess_inv, res_variance)
     cov = hess_inv * res_variance
     return fit, cov
 
@@ -464,7 +472,7 @@ def rough_min_max_views(xs, ys, es):
         'dist_total_max_views': total_max,
     }
 
-def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1, zero_frac=None):
+def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1, zero_frac=None, func=normal_distribution, force_simple_fit=False):
     # Important to make sure the distribution is properly normalized
     # Meaning, area is 1.0. So sum(y*d) = 1.0
     h = list(zip(xs, ys, es))
@@ -491,14 +499,17 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     fit_ys = [y * d for y in ys]
     fit_es = [e * d for e in es]
 
-    if ys[1] < 0.66 * ys[0] and ys[0]==max(ys):
+    if (ys[1] < 0.66 * ys[0] and ys[0]==max(ys) and func==normal_distribution) or force_simple_fit:
         # Use the normal_distribution_tail case...
         func = normal_distribution_tail
         p0 = [2.0, ys[0]*3.0]
-    else:
+    elif func==normal_distribution:
         # Just use normal distribution...
         func = normal_distribution
         p0 = [1.0, 2.0, 1.0]
+    else:
+        func = polynomial_distribution
+        p0 = P0_POLYNOMIAL_DISTRIBUTION#[1.5, 0.1, 0.0, 0.0]#, 0.0015, 0.0015]
 
     func_fit = lambda x, p: bin_sampled_distribution(x, p, func, n=n, n_extra_bins=n_extra_bins)
 
