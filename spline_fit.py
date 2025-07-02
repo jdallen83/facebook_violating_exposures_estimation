@@ -70,12 +70,12 @@ es = es_bullying
 # ---------------
 
 
-n_extra_bins = 1
+n_extra_bins = 0
 n = 100
 n_samples = 10000
 
 
-
+# --
 
 h = list(zip(xs, ys, es))
 h = sorted(h, key=lambda x: x[0])
@@ -130,7 +130,7 @@ for i in range(len(xs)+n_extra_bins):
     x_cspl = np.array(list(x_spl[i * n:(i+1) * n]))
     y_cspl = np.array(list(y_spl[i * n:(i+1) * n]))
 
-    if i < len(xs):
+    if i < len(xs) - 1:
         xl = xs[i] - width / 2.0
         xh = xs[i] + width / 2.0
         x = xs[i]
@@ -141,10 +141,21 @@ for i in range(len(xs)+n_extra_bins):
         xl = xs[-1] - width / 2.0 + (i - len(xs) + 1) * width
         xh = xs[-1] + width / 2.0 + (i - len(xs) + 1) * width
         x = (xl + xh) / 2.0
-        y = 0.0
-        target_area = ys[-1] * width
+
+        if i == len(xs) - 1:
+            y = ys[i]
+        else:
+            y = 0.0
+
+        target_full_area = ys[-1] * width
+
         full_y = np.array(list(y_spl[(len(xs)-1)*n:]))
-        cur_area = sum(full_y*d)
+
+        full_y_area = sum(full_y) * d
+        cur_area = sum(y_cspl) * d
+
+        target_area = target_full_area * cur_area / full_y_area
+
 
     scale_factor = target_area / cur_area
 
@@ -171,5 +182,23 @@ for i in range(len(xs)+n_extra_bins):
     })
 
 for fb in fit_bins:
-    print(fb['x'], fb['y'], fb['weight'], fb['x_mean'], fb['views'])
+    print("{}\t{}\t{}\t{}\t{}".format(fb['x'], fb['y'], fb['weight'], fb['x_mean'], fb['views']))
+
+##
+
+plot.plot([
+        ('plot', x_spl, y_spl, {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('plot', xs, ys, {'color': 'tab:blue', 'linestyle': '', 'marker': 'o'})
+    ],
+)
+plot.pl.show()
+
+##
+
+plot.plot([
+        ('plot', x_spl, y_spl_scaled, {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('plot', xs, ys, {'color': 'tab:blue', 'linestyle': '', 'marker': 'o'})
+    ],
+)
+plot.pl.show()
 
