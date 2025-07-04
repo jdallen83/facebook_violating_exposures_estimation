@@ -336,7 +336,6 @@ def chi2_fit(func, x, y, e, p):
     fit, hess_inv, infodict, errmsg, success = sp.optimize.leastsq(error_func, p, args=(np.array(x), np.array(y), np.array(e)), full_output=1)
     res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
 
-    print(fit, hess_inv, res_variance)
     cov = hess_inv * res_variance
     return fit, cov
 
@@ -607,7 +606,7 @@ def average_sampled_estimates(fits, zero_frac=None):
         }
 
         if zero_frac is not None:
-            for k in (k for k in mb.keys() if k not in ('x', 'x_mean', 'x_mean_std')):
+            for k in list((k for k in mb.keys() if k not in ('x', 'x_mean', 'x_mean_std'))):
                 mb[k + '_with_0'] = mb[k] * (1.0 - zero_frac)
 
         mean_bins.append(mb)
@@ -650,7 +649,7 @@ def average_sampled_estimates(fits, zero_frac=None):
         'scaled_fit_high': best_fit_scaled_h,
     }
     if zero_frac is not None:
-        for k in (k for k in curves.keys() if k not in ('x')):
+        for k in list((k for k in curves.keys() if k not in ('x'))):
             curves[k + '_with_0'] = [v * (1.0 - zero_frac) for v in curves[k]]
 
     return mean_bins, curves, (views, views_uncert), (views * (1.0 - zero_frac) if zero_frac is not None else None, views_uncert * (1.0 - zero_frac) if zero_frac is not None else None)
