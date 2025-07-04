@@ -472,6 +472,214 @@ def rough_min_max_views(xs, ys, es):
         'dist_total_max_views': total_max,
     }
 
+
+def single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=1, n=100):
+    h = list(zip(xs, ys))
+    h = sorted(h, key=lambda x: x[0])
+    xs = [x for x, y in h]
+    ys = [y for x, y in h]
+
+    width = xs[1] - xs[0]
+    cur_area = sum([y * width for y in ys])
+    ys = [y / cur_area for y in ys]
+
+
+
+    xs_spl = list(xs)
+    ys_spl = list(ys)
+
+
+    xs_spl.insert(0, xs_spl[0] - width / 2.0)
+    ys_spl.insert(0, ys_spl[0])
+
+    xs_spl.append(xs_spl[-1] + (n_extra_bins + 0.5) * width)
+    ys_spl.append(0.0)
+
+    spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped")
+
+    x_spl = np.linspace(0, xs_spl[-1], num=n * (len(xs) + n_extra_bins), endpoint=False)
+    y_spl = np.maximum(spl(x_spl), 0.0)
+
+    x_spl = list(x_spl)
+    y_spl = list(y_spl)
+
+    y_spl_scaled = []
+
+    #plot.plot([
+    #        ('plot', x_spl, y_spl, {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+    #        ('plot', xs, ys, {'color': 'tab:blue', 'linestyle': '', 'marker': 'o'})
+    #    ],
+    #)
+    #plot.pl.show()
+
+
+    bins = []
+    d = width * 1.0 / n
+
+    fit_bins = []
+
+    for i in range(len(xs)+n_extra_bins):
+        x_cspl = np.array(list(x_spl[i * n:(i+1) * n]))
+        y_cspl = np.array(list(y_spl[i * n:(i+1) * n]))
+
+        if i < len(xs) - 1:
+            xl = xs[i] - width / 2.0
+            xh = xs[i] + width / 2.0
+            x = xs[i]
+            y = ys[i]
+            target_area = y * width
+            cur_area = sum(y_cspl*d)
+        else:
+            xl = xs[-1] - width / 2.0 + (i - len(xs) + 1) * width
+            xh = xs[-1] + width / 2.0 + (i - len(xs) + 1) * width
+            x = (xl + xh) / 2.0
+
+            if i == len(xs) - 1:
+                y = ys[i]
+            else:
+                y = 0.0
+
+            target_full_area = ys[-1] * width
+
+            full_y = np.array(list(y_spl[(len(xs)-1)*n:]))
+
+            full_y_area = sum(full_y) * d
+            cur_area = sum(y_cspl) * d
+
+            target_area = target_full_area * cur_area / full_y_area
+
+
+        scale_factor = target_area / cur_area if cur_area > 0.0 else 0.0
+
+        y_cspl_scale = y_cspl * scale_factor
+        y_spl_scaled = y_spl_scaled + [float(f) for f in y_cspl_scale]
+
+        weight = sum(y_cspl_scale*d)
+
+        x_mean = sum(y_cspl_scale * x_cspl * d) / weight if weight > 0.0 else 0.0
+
+        views = 10**x_mean * weight
+        views_l = 10**xl * weight
+        views_h = 10**xh * weight
+
+        fit_bins.append({
+            'x': float(x),
+            'y': float(y),
+            'target_weight': float(target_area),
+            'weight': float(weight),
+            'x_mean': float(x_mean),
+            'views': float(views),
+            'views_l': float(views_l),
+            'views_h': float(views_h),
+        })
+
+    return {
+        'fit_bins': fit_bins,
+        'curves': {
+            'x': x_spl,
+            'y': y_spl,
+            'y_scaled': y_spl_scaled,
+        }
+    }
+
+
+def average_sampled_estimates(fits, zero_frac=None):
+    mean_bins = []
+    for i in range(len(fits[0]['fit_bins'])):
+        x = [f['fit_bins'][i]['x'] for f in fits]
+        y = [f['fit_bins'][i]['y'] for f in fits]
+        target_weights = [f['fit_bins'][i]['target_weight'] for f in fits]
+        weights = [f['fit_bins'][i]['weight'] for f in fits]
+        x_means = [f['fit_bins'][i]['x_mean'] for f in fits]
+        weighted_views = [f['fit_bins'][i]['views'] for f in fits]
+        views = [10**f['fit_bins'][i]['x_mean'] for f in fits]
+
+        mb = {
+            'bin_id': float(np.mean(x)),
+            'weight_mean': float(np.mean(target_weights)),
+            'weight_std': float(np.std(target_weights)),
+            'log_views_mean': float(np.std(x_means)),
+            'log_views_std': float(np.std(x_means)),
+            'weighted_views_mean': float(np.mean(weighted_views)),
+            'weighted_views_std': float(np.std(weighted_views)),
+            'views_mean': float(np.mean(views)),
+            'views_std': float(np.std(views)),
+        }
+
+        if zero_frac is not None:
+            for k in (k for k in mb.keys() if k not in ('x', 'x_mean', 'x_mean_std')):
+                mb[k + '_with_0'] = mb[k] * (1.0 - zero_frac)
+
+        mean_bins.append(mb)
+
+    pivot_bins = {k: [b[k] for b in mean_bins] for k in mean_bins[0].keys()}
+    views = sum(pivot_bins['weighted_views_mean'])
+    views_uncert = float(np.sqrt(sum([v**2 for v in pivot_bins['weighted_views_std']])))
+
+    curves = [f['curves'] for f in fits]
+    curves_y = [c['y'] for c in curves]
+    curves_y_scaled = [c['y_scaled'] for c in curves]
+
+    y_samples = [[yy[i] for yy in curves_y] for i in range(len(curves[0]['y']))]
+    y_scaled_samples = [[yy[i] for yy in curves_y_scaled] for i in range(len(curves[0]['y_scaled']))]
+
+    y_mean = [float(np.mean(yy)) for yy in y_samples]
+    y_std = [float(np.std(yy)) for yy in y_samples]
+
+    best_fit = list(y_mean)
+    best_fit_h = [y + e for y, e in zip(y_mean, y_std)]
+    best_fit_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_mean, y_std)]
+
+
+    y_scaled_mean = [float(np.mean(yy)) for yy in y_scaled_samples]
+    y_scaled_std = [float(np.std(yy)) for yy in y_scaled_samples]
+
+    best_fit_scaled = list(y_scaled_mean)
+    best_fit_scaled_h = [y + e for y, e in zip(y_scaled_mean, y_scaled_std)]
+    best_fit_scaled_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_scaled_mean, y_scaled_std)]
+
+    x_bf = curves[0]['x']
+
+    curves = {
+        'x': x_bf,
+        'best_fit': best_fit,
+        'best_fit_low': best_fit_l,
+        'best_fit_high': best_fit_h,
+        'scaled_fit': best_fit_scaled,
+        'scaled_fit_low': best_fit_scaled_l,
+        'scaled_fit_high': best_fit_scaled_h,
+    }
+    if zero_frac is not None:
+        for k in (k for k in curves.keys() if k not in ('x')):
+            curves[k + '_with_0'] = [v * (1.0 - zero_frac) for v in curves[k]]
+
+    return mean_bins, curves, (views, views_uncert), (views * (1.0 - zero_frac) if zero_frac is not None else None, views_uncert * (1.0 - zero_frac) if zero_frac is not None else None)
+
+
+def estimate_views_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_samples=10000, zero_frac=None):
+    fit_data = single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=n_extra_bins, n=n)
+
+    fits = []
+    for i in range(n_samples):
+        cur_x = []
+        cur_y = []
+        for x, y, e in zip(xs, ys, es):
+            cur_x.append(x)
+            yy = random.uniform(y - e, y + e)
+            yy = yy if yy > 0.0 else 0.0
+            cur_y.append(yy)
+        fits.append(single_estimate_views_in_bins_with_spline(cur_x, cur_y, n_extra_bins=n_extra_bins, n=n))
+
+    fit_bins, curves, estimate, estimate_with_0 = average_sampled_estimates(fits, zero_frac=zero_frac)
+    return {
+        'data': fit_data,
+        'fit_bins': fit_bins,
+        'curves': curves,
+        'estimate': estimate,
+        'estimate_with_0': estimate_with_0,
+    }
+
+
 def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500, n_extra_bins=1, zero_frac=None, func=normal_distribution, force_simple_fit=False):
     # Important to make sure the distribution is properly normalized
     # Meaning, area is 1.0. So sum(y*d) = 1.0
@@ -485,6 +693,8 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     cur_area = sum([y * d for y in ys])
     ys = [y / cur_area for y in ys]
     es = [e / cur_area for e in es]
+
+    fit_spline = estimate_views_with_splines(xs, ys, es, n_extra_bins=n_extra_bins, n=n, n_samples=n_samples, zero_frac=zero_frac)
 
     # Now, if there are multiple training 0 bins, the fit+projection
     # will get wonky (Due to rounding uncertainty).
@@ -525,9 +735,15 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     sampled_min_max = sample_min_max_views(xs, ys, es, n=n)
     min_max_views = rough_min_max_views(xs, ys, es)
 
+    #for k in fit_spline['curves'].keys() if k not in ('x') and 'with_0' not in k:
+    #    curves[k + '_spline'] = fit_spline['curves'][k]
+
     r = {
         'estimated_views': total_views,
         'estimated_views_uncert': total_view_uncert,
+
+        'estimated_views_spline': fit_spline['estimate'][0],
+        'estimated_views_spline_uncert': fit_spline['estimate'][1],
 
         'min_views': sampled_min_max['min_est'],
         'min_views_avg': sampled_min_max['min_est_avg'],
@@ -543,7 +759,10 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
         'fit_covariance': [[float(p) for p in fc] for fc in fit_cov],
         'fit_uncertainty': [float(p) for p in fit_uncert],
         'fit_bins': fit_bins,
+        'fit_bins_spline': [{k: v for k, v in fb.items() if 'with_0' not in k} for fb in fit_spline['fit_bins']],
+        'fit_bins_spline_with_0': [{k: v for k, v in fb.items() if 'with_0' not in k or k=='bin_id'} for fb in fit_spline['fit_bins']],
         'curves': curves,
+        'curves_spline': fit_spline['curves'],
     }
 
     r.update(min_max_views)
@@ -553,7 +772,16 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
         'Rounding Uncertainty': (r['dist_rounding_min_views'], r['dist_mid_views'], r['dist_rounding_max_views']),
         'Total Uncertainty': (r['dist_total_min_views'], r['dist_mid_views'], r['dist_total_max_views']),
         'Sampled Variance': (r['min_views']-r['min_views_uncert'], r['mid_views_avg'], r['max_views']+r['max_views_uncert']),
-        'Modeled': (r['estimated_views'] - r['estimated_views_uncert'], r['estimated_views'], r['estimated_views'] + r['estimated_views_uncert']),
+        'Modeled (Normal)': (
+            r['estimated_views'] - r['estimated_views_uncert'],
+            r['estimated_views'],
+            r['estimated_views'] + r['estimated_views_uncert']
+        ),
+        'Modeled (Spline)': (
+            fit_spline['estimate'][0] - fit_spline['estimate'][1],
+            fit_spline['estimate'][0],
+            fit_spline['estimate'][0] + fit_spline['estimate'][1],
+        )
     }
     r['estimates'] = estimates
 
@@ -575,6 +803,15 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
             'scaled_fit': [y*nzf for y in r['curves']['scaled_fit']],
             'scaled_fit_low': [y*nzf for y in r['curves']['scaled_fit_low']],
             'scaled_fit_high': [y*nzf for y in r['curves']['scaled_fit_high']],
+        }
+        rr['spline_curves_with_0'] = {
+            'x': r['curves_spline']['x'],
+            'best_fit': [y*nzf for y in r['curves_spline']['best_fit']],
+            'best_fit_low': [y*nzf for y in r['curves_spline']['best_fit_low']],
+            'best_fit_high': [y*nzf for y in r['curves_spline']['best_fit_high']],
+            'scaled_fit': [y*nzf for y in r['curves_spline']['scaled_fit']],
+            'scaled_fit_low': [y*nzf for y in r['curves_spline']['scaled_fit_low']],
+            'scaled_fit_high': [y*nzf for y in r['curves_spline']['scaled_fit_high']],
         }
         rr['estimates_with_0'] = dict([
             (k, [vv * nzf for vv in v]) for k, v in r['estimates'].items()
@@ -610,23 +847,24 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
     wvs_l = [wv if wv>0.0 else 0.0 for wv in wvs_l]
     wvs_h = [fb['weighted_views_mean']+fb['weighted_views_std'] for fb in fit['fit_bins']]
 
-    bfvs_l = [f['views_best_fit_low'] for f in fit['fit_bins']]
-    bfvs_h = [f['views_best_fit_high'] for f in fit['fit_bins']]
-    dvs_l = [f['views_data_low'] for f in fit['fit_bins']]
-    dvs_h = [f['views_data_high'] for f in fit['fit_bins']]
-    dvs_ll = [f['views_data_min'] for f in fit['fit_bins']]
-    dvs_hh = [f['views_data_max'] for f in fit['fit_bins']]
+    if 'views_best_fit_low' in fit['fit_bins'][0]:
+        bfvs_l = [f['views_best_fit_low'] for f in fit['fit_bins']]
+        bfvs_h = [f['views_best_fit_high'] for f in fit['fit_bins']]
+        dvs_l = [f['views_data_low'] for f in fit['fit_bins']]
+        dvs_h = [f['views_data_high'] for f in fit['fit_bins']]
+        dvs_ll = [f['views_data_min'] for f in fit['fit_bins']]
+        dvs_hh = [f['views_data_max'] for f in fit['fit_bins']]
 
-    x_dvs = list(xs)
-    while dvs_h[-1]==0.0:
-        dvs_h = dvs_h[:-1]
-        dvs_l = dvs_l[:-1]
-        x_dvs = x_dvs[:-1]
-    x_dvsmm = list(xs)
-    while dvs_hh[-1]==0.0:
-        dvs_hh = dvs_hh[:-1]
-        dvs_ll = dvs_ll[:-1]
-        x_dvsmm = x_dvsmm[:-1]
+        x_dvs = list(xs)
+        while dvs_h[-1]==0.0:
+            dvs_h = dvs_h[:-1]
+            dvs_l = dvs_l[:-1]
+            x_dvs = x_dvs[:-1]
+        x_dvsmm = list(xs)
+        while dvs_hh[-1]==0.0:
+            dvs_hh = dvs_hh[:-1]
+            dvs_ll = dvs_ll[:-1]
+            x_dvsmm = x_dvsmm[:-1]
 
     curves = fit['curves']
 
@@ -672,32 +910,33 @@ def plot_estimation_from_discrete_distribution(estimates, fit_bins, curves, file
         show=False,
         save="{}_Modeled_Views_Per_Bin.png".format(filetag),
     )
-    plot.plot([
-        ('fill_between', xs, bfvs_l, bfvs_h, {'color': 'tab:orange', 'alpha': 0.5, 'label': 'Best Fit'}),
-        ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),],
-        title="Views Per Bin [{}]".format(label),
-        xlabel="Log10(Views) Bin",
-        ylabel="Views",
-        xlim=[0.0, None],
-        ylim=[0.0, None],
-        style=style,
-        show=False,
-        save="{}_Best_Fit_Views_Per_Bin.png".format(filetag),
-    )
-    plot.plot([
-        ('fill_between', x_dvsmm, dvs_ll, dvs_hh, {'color': 'tab:blue', 'alpha': 0.3, 'label': 'Max Data Range'}),
-        ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),
-        ('plot', xs, wvs, {'color': 'tab:orange', 'label': 'Model', 'marker': 'o', 'linestyle': '-'}),
-        ],
-        title="Views Per Bin [{}]".format(label),
-        xlabel="Log10(Views) Bin",
-        ylabel="Views",
-        xlim=[0.0, None],
-        ylim=[0.0, None],
-        style=style,
-        show=False,
-        save="{}_Modeled_Data_Views_Per_Bin.png".format(filetag),
-    )
+    if 'views_best_fit_low' in fit['fit_bins'][0]:
+        plot.plot([
+            ('fill_between', xs, bfvs_l, bfvs_h, {'color': 'tab:orange', 'alpha': 0.5, 'label': 'Best Fit'}),
+            ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),],
+            title="Views Per Bin [{}]".format(label),
+            xlabel="Log10(Views) Bin",
+            ylabel="Views",
+            xlim=[0.0, None],
+            ylim=[0.0, None],
+            style=style,
+            show=False,
+            save="{}_Best_Fit_Views_Per_Bin.png".format(filetag),
+        )
+        plot.plot([
+            ('fill_between', x_dvsmm, dvs_ll, dvs_hh, {'color': 'tab:blue', 'alpha': 0.3, 'label': 'Max Data Range'}),
+            ('fill_between', x_dvs, dvs_l, dvs_h, {'color': 'tab:blue', 'alpha': 0.5, 'label': 'Data'}),
+            ('plot', xs, wvs, {'color': 'tab:orange', 'label': 'Model', 'marker': 'o', 'linestyle': '-'}),
+            ],
+            title="Views Per Bin [{}]".format(label),
+            xlabel="Log10(Views) Bin",
+            ylabel="Views",
+            xlim=[0.0, None],
+            ylim=[0.0, None],
+            style=style,
+            show=False,
+            save="{}_Modeled_Data_Views_Per_Bin.png".format(filetag),
+        )
 
     estimates_uncert_pairs = list(estimates_uncert.items())
     estimates_xs = [i+1 for i in range(len(estimates_uncert_pairs))]

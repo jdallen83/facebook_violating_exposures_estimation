@@ -1,6 +1,8 @@
 import scipy as sp
 import numpy as np
 from facebook_violating_exposures_estimation import plot as plot
+import facebook_violating_exposures_estimation.distribution_fit as dist_fit
+
 import random
 
 # Basic idea... use spline interpolation for everything.
@@ -62,9 +64,9 @@ es_hate = [e / area_hate for e in es_fb]
 # ------------
 
 xs = xs_fb
-ys = ys_hate
-es = es_hate
-
+ys = ys_bullying
+es = es_bullying
+zero_frac = 1.0 - area_bullying
 
 
 # ---------------
@@ -89,11 +91,9 @@ def single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=1, n=100):
 
     xs_spl.insert(0, xs_spl[0] - width / 2.0)
     ys_spl.insert(0, ys_spl[0])
-    es_spl.insert(0, es_spl[0]/10000.0)
 
     xs_spl.append(xs_spl[-1] + (n_extra_bins + 0.5) * width)
     ys_spl.append(0.0)
-    es_spl.append(es_spl[-1]/10000.0)
 
     spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped")
 
@@ -183,7 +183,81 @@ def single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=1, n=100):
     }
 
 
-def estimate_views_in_bins_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_samples=10000):
+def average_sampled_estimates(fits, zero_frac=None):
+    mean_bins = []
+    for i in range(len(fits[0]['fit_bins'])):
+        x = [f['fit_bins'][i]['x'] for f in fits]
+        y = [f['fit_bins'][i]['y'] for f in fits]
+        target_weights = [f['fit_bins'][i]['target_weight'] for f in fits]
+        weights = [f['fit_bins'][i]['weight'] for f in fits]
+        x_means = [f['fit_bins'][i]['x_mean'] for f in fits]
+        views = [f['fit_bins'][i]['views'] for f in fits]
+
+        mb = {
+            'x': float(np.mean(x)),
+            'y': float(np.mean(y)),
+            'y_std': float(np.std(y)),
+            'target_weight': float(np.mean(target_weights)),
+            'target_weight_std': float(np.std(target_weights)),
+            'weight': float(np.mean(weights)),
+            'weight_std': float(np.std(weights)),
+            'x_mean': float(np.std(x_means)),
+            'x_mean_std': float(np.std(x_means)),
+            'views': float(np.mean(views)),
+            'views_std': float(np.std(views)),
+        }
+
+        if zero_frac is not None:
+            for k in mb.keys() if k not in ('x', 'x_mean', 'x_mean_std'):
+                mb[k + '_with_0'] = mb[k] * (1.0 - zero_frac)
+
+        mean_bins.append(mb)
+
+    pivot_bins = {k: [b[k] for b in mean_bins] for k in mean_bins[0].keys()}
+    views = sum(pivot_bins['views'])
+    views_uncert = float(np.sqrt(sum([v**2 for v in pivot_bins['views_std']])))
+
+    curves = [f['curves'] for f in fits]
+    curves_y = [c['y'] for c in curves]
+    curves_y_scaled = [c['y_scaled'] for c in curves]
+
+    y_samples = [[yy[i] for yy in curves_y] for i in range(len(curves[0]['y']))]
+    y_scaled_samples = [[yy[i] for yy in curves_y_scaled] for i in range(len(curves[0]['y_scaled']))]
+
+    y_mean = [float(np.mean(yy)) for yy in y_samples]
+    y_std = [float(np.std(yy)) for yy in y_samples]
+
+    best_fit = list(y_mean)
+    best_fit_h = [y + e for y, e in zip(y_mean, y_std)]
+    best_fit_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_mean, y_std)]
+
+
+    y_scaled_mean = [float(np.mean(yy)) for yy in y_scaled_samples]
+    y_scaled_std = [float(np.std(yy)) for yy in y_scaled_samples]
+
+    best_fit_scaled = list(y_scaled_mean)
+    best_fit_scaled_h = [y + e for y, e in zip(y_scaled_mean, y_scaled_std)]
+    best_fit_scaled_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_scaled_mean, y_scaled_std)]
+
+    x_bf = curves[0]['x']
+
+    curves = {
+        'x': x_bf,
+        'best_fit': best_fit,
+        'best_fit_low': best_fit_l,
+        'best_fit_high': best_fit_h,
+        'scaled_fit': best_fit_scaled,
+        'scaled_fit_low': best_fit_scaled_l,
+        'scaled_fit_high': best_fit_scaled_h,
+    }
+    if zero_frac is not None:
+        for k in curves.keys() if k not in ('x'):
+            curves[k + '_with_0'] = [v * (1.0 - zero_frac) for v in curves[k]]
+
+    return mean_bins, curves, (views, views_uncert), (views * (1.0 - zero_frac) if zero_frac is not None else None, views_uncert * (1.0 - zero_frac) if zero_frac is not None else None)
+
+
+def estimate_views_in_bins_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_samples=10000, zero_frac=None):
     fit_data = single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=n_extra_bins, n=n)
 
     fits = []
@@ -197,48 +271,103 @@ def estimate_views_in_bins_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_sam
             cur_y.append(yy)
         fits.append(single_estimate_views_in_bins_with_spline(cur_x, cur_y, n_extra_bins=n_extra_bins, n=n))
 
-    return fit_data, fits
+    fit_bins, curves, estimate = average_sampled_estimates(fits, zero_frac=zero_frac)
+    return {
+        'data': fit_data,
+        'fit_bins': fit_bins,
+        'curves': curves,
+        'estimate': estimate,
+    }
 
 
-data_fit, fits = estimate_views_in_bins_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_samples=10000)
+fit_spline = estimate_views_in_bins_with_splines(xs, ys, es, n_extra_bins=0, n=100, n_samples=10000, zero_frac=zero_frac)
+
+
+
+
+
+fit = dist_fit.estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=10000, n_extra_bins=1, zero_frac=0.0)
+
 ##
 
-mean_bins = []
-for i in range(len(fits[0]['fit_bins'])):
-    x = [f['fit_bins'][i]['x'] for f in fits]
-    y = [f['fit_bins'][i]['y'] for f in fits]
-    target_weights = [f['fit_bins'][i]['target_weight'] for f in fits]
-    weights = [f['fit_bins'][i]['weight'] for f in fits]
-    x_means = [f['fit_bins'][i]['x_mean'] for f in fits]
-    views = [f['fit_bins'][i]['views'] for f in fits]
+for k, v in fit['estimates'].items():
+    print(k, v)
 
-    mean_bins.append({
-        'x': float(np.mean(x)),
-        'y': float(np.mean(y)),
-        'y_std': float(np.std(y)),
-        'target_weight': float(np.mean(target_weights)),
-        'target_weight_std': float(np.std(target_weights)),
-        'weight': float(np.mean(weights)),
-        'weight_std': float(np.std(weights)),
-        'x_mean': float(np.std(x_means)),
-        'x_mean_std': float(np.std(x_means)),
-        'views': float(np.mean(views)),
-        'views_std': float(np.std(views)),
-    })
+##
+
+curves = [f['curves'] for f in fits]
+curves_y = [c['y'] for c in curves]
+curves_y_scaled = [c['y_scaled'] for c in curves]
+
+y_samples = [[yy[i] for yy in curves_y] for i in range(len(curves[0]['y']))]
+y_scaled_samples = [[yy[i] for yy in curves_y_scaled] for i in range(len(curves[0]['y_scaled']))]
+
+y_mean = [float(np.mean(yy)) for yy in y_samples]
+y_std = [float(np.std(yy)) for yy in y_samples]
+
+best_fit = list(y_mean)
+best_fit_h = [y + e for y, e in zip(y_mean, y_std)]
+best_fit_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_mean, y_std)]
 
 
-for fb in mean_bins:
-    print("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
-        fb['x'], fb['y'], fb['y_std'], fb['target_weight'], fb['target_weight_std'],
-        fb['weight'], fb['weight_std'], fb['x_mean'], fb['x_mean_std'], fb['views'], fb['views_std'],
-    ))
+y_scaled_mean = [float(np.mean(yy)) for yy in y_scaled_samples]
+y_scaled_std = [float(np.std(yy)) for yy in y_scaled_samples]
 
+best_fit_scaled = list(y_scaled_mean)
+best_fit_scaled_h = [y + e for y, e in zip(y_scaled_mean, y_scaled_std)]
+best_fit_scaled_l = [y - e if y - e > 0.0 else 0.0 for y, e in zip(y_scaled_mean, y_scaled_std)]
 
-for fb in data_fit['fit_bins']:
-    print("{}\t{}\t{}\t{}\t{}\t{}".format(
-        fb['x'], fb['y'], fb['target_weight'],
-        fb['weight'], fb['x_mean'], fb['views'],
-    ))
+x_bf = curves[0]['x']
+
+##
+
+plot.plot([
+        ('fill_between', x_bf, best_fit_l, best_fit_h, {'color': 'tab:orange', 'alpha': 0.5}),
+        ('plot', x_bf, best_fit, {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'marker': 'o', 'linestyle': '', 'yerr': es}),
+    ],
+    show=True,
+    xlim=[0.0, None],
+    ylim=[0.0, None],
+
+)
+##
+plot.plot([
+        ('fill_between', x_bf, best_fit_scaled_l, best_fit_scaled_h, {'color': 'tab:orange', 'alpha': 0.5}),
+        ('plot', x_bf, best_fit_scaled, {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'marker': 'o', 'linestyle': '', 'yerr': es}),
+    ],
+    show=True,
+    xlim=[0.0, None],
+    ylim=[0.0, None],
+)
+
+##
+
+fit_curves = fit['curves']
+plot.plot([
+        ('fill_between', fit_curves['x'], fit_curves['best_fit_low'], fit_curves['best_fit_high'], {'color': 'tab:orange', 'alpha': 0.5}),
+        ('plot', fit_curves['x'], fit_curves['best_fit'], {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'marker': 'o', 'linestyle': '', 'yerr': es}),
+    ],
+    show=True,
+    xlim=[0.0, None],
+    ylim=[0.0, None],
+)
+
+##
+
+fit_curves = fit['curves']
+plot.plot([
+        ('fill_between', fit_curves['x'], fit_curves['scaled_fit_low'], fit_curves['scaled_fit_high'], {'color': 'tab:orange', 'alpha': 0.5}),
+        ('plot', fit_curves['x'], fit_curves['scaled_fit'], {'color': 'tab:orange', 'marker': '', 'linestyle': '-'}),
+        ('errorbar', xs, ys, {'color': 'tab:blue', 'marker': 'o', 'linestyle': '', 'yerr': es}),
+    ],
+    show=True,
+    xlim=[0.0, None],
+    ylim=[0.0, None],
+)
+
 
 ##
 
