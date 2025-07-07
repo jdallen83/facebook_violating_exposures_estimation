@@ -593,6 +593,11 @@ def average_sampled_estimates(fits, zero_frac=None):
         weighted_views = [f['fit_bins'][i]['views'] for f in fits]
         views = [10**f['fit_bins'][i]['x_mean'] for f in fits]
 
+        width = fits[0]['fit_bins'][1]['x'] - fits[0]['fit_bins'][0]['x']
+        x_low = fits[0]['fit_bins'][i]['x'] - width / 2.0
+        x_high = fits[0]['fit_bins'][i]['x'] + width / 2.0
+        x_mid = fits[0]['fit_bins'][i]['x']
+
         mb = {
             'bin_id': float(np.mean(x)),
             'weight_mean': float(np.mean(target_weights)),
@@ -603,10 +608,17 @@ def average_sampled_estimates(fits, zero_frac=None):
             'weighted_views_std': float(np.std(weighted_views)),
             'views_mean': float(np.mean(views)),
             'views_std': float(np.std(views)),
+            'views_data_low': 10**x_low * float(np.mean(target_weights)),
+            'views_data_high': 10**x_high * float(np.mean(target_weights)),
+            'views_data_mid': 10**x_mid * float(np.mean(target_weights)),
+            'views_data_min': 10**x_low * max([0.0, float(np.mean(target_weights)) - float(np.std(target_weights))]),
+            'views_data_max': 10**x_high * (float(np.mean(target_weights)) + float(np.std(target_weights))),
+            'views_best_fit_low': float(np.mean(weighted_views)) - float(np.std(weighted_views)),
+            'views_best_fit_high': float(np.mean(weighted_views)) + float(np.std(weighted_views)),
         }
 
         if zero_frac is not None:
-            for k in list((k for k in mb.keys() if k not in ('x', 'x_mean', 'x_mean_std'))):
+            for k in list((k for k in mb.keys() if k not in ('bin_id', 'x', 'x_mean', 'x_mean_std'))):
                 mb[k + '_with_0'] = mb[k] * (1.0 - zero_frac)
 
         mean_bins.append(mb)
@@ -688,10 +700,24 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
     ys = [y for x, y, e in h]
     es = [e for x, y, e in h]
 
+    data_original = {
+        'x': list(xs),
+        'y': list(ys),
+        'es': list(es),
+        'zero_frac': zero_frac,
+    }
+
     d = xs[1] - xs[0]
     cur_area = sum([y * d for y in ys])
     ys = [y / cur_area for y in ys]
     es = [e / cur_area for e in es]
+
+    data_normalized = {
+        'x': list(xs),
+        'y': list(ys),
+        'es': list(es),
+        'zero_frac': zero_frac,
+    }
 
     fit_spline = estimate_views_with_splines(xs, ys, es, n_extra_bins=n_extra_bins, n=n, n_samples=n_samples, zero_frac=zero_frac)
 
@@ -736,7 +762,8 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
 
     #for k in fit_spline['curves'].keys() if k not in ('x') and 'with_0' not in k:
     #    curves[k + '_spline'] = fit_spline['curves'][k]
-
+    print(fit_spline['fit_bins'][0])
+    print(fit_spline['fit_bins'][0].keys())
     r = {
         'estimated_views': total_views,
         'estimated_views_uncert': total_view_uncert,
@@ -758,10 +785,14 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
         'fit_covariance': [[float(p) for p in fc] for fc in fit_cov],
         'fit_uncertainty': [float(p) for p in fit_uncert],
         'fit_bins': fit_bins,
-        'fit_bins_spline': [{k: v for k, v in fb.items() if 'with_0' not in k} for fb in fit_spline['fit_bins']],
-        'fit_bins_spline_with_0': [{k: v for k, v in fb.items() if 'with_0' not in k or k=='bin_id'} for fb in fit_spline['fit_bins']],
+        'fit_bins_spline':
+            [{k: v for k, v in fb.items() if 'with_0' not in k} for fb in fit_spline['fit_bins']],
+        'fit_bins_spline_with_0':
+            [{k.replace('_with_0', ''): v for k, v in fb.items() if '_with_0' in k or k=='bin_id'} for fb in fit_spline['fit_bins']],
         'curves': curves,
         'curves_spline': fit_spline['curves'],
+        'data': data_original,
+        'data_normalized': data_normalized,
     }
 
     r.update(min_max_views)
@@ -803,7 +834,7 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
             'scaled_fit_low': [y*nzf for y in r['curves']['scaled_fit_low']],
             'scaled_fit_high': [y*nzf for y in r['curves']['scaled_fit_high']],
         }
-        rr['spline_curves_with_0'] = {
+        rr['curves_spline_with_0'] = {
             'x': r['curves_spline']['x'],
             'best_fit': [y*nzf for y in r['curves_spline']['best_fit']],
             'best_fit_low': [y*nzf for y in r['curves_spline']['best_fit_low']],

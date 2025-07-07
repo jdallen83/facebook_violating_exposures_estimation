@@ -145,7 +145,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_spline_with_0'], fit['spline_curves_with_0'], histo_filetag + '__spline', label=histo_label + ' [Spline]')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_spline_with_0'], fit['curves_spline_with_0'], histo_filetag + '__spline', label=histo_label + ' [Spline]')
 
     r = {
         'lower_bound': low_limit,
