@@ -668,6 +668,19 @@ def average_sampled_estimates(fits, zero_frac=None):
 
 
 def estimate_views_with_splines(xs, ys, es, n_extra_bins=1, n=100, n_samples=10000, zero_frac=None):
+    # Fit can get very inaccurate for distributions with 2 trailing 0 bins
+    # This is due to the fit spline oscialting around 0, which can put a lot of weight in very high bins
+    # Best option is to truncate multiple trailing 0s
+
+    cont = True
+    while cont:
+        if ys[-1] <= 0.0 and ys[-2] <= 0.0:
+            xs = xs[:-1]
+            ys = ys[:-1]
+            es = es[:-1]
+        else:
+            cont = False
+
     fit_data = single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=n_extra_bins, n=n)
 
     fits = []
