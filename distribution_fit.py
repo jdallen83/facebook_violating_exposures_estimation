@@ -762,8 +762,6 @@ def estimate_views_from_discrete_distribution(xs, ys, es, n=100, n_samples=1500,
 
     #for k in fit_spline['curves'].keys() if k not in ('x') and 'with_0' not in k:
     #    curves[k + '_spline'] = fit_spline['curves'][k]
-    print(fit_spline['fit_bins'][0])
-    print(fit_spline['fit_bins'][0].keys())
     r = {
         'estimated_views': total_views,
         'estimated_views_uncert': total_view_uncert,
