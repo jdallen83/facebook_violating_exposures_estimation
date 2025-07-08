@@ -488,19 +488,45 @@ def single_estimate_views_in_bins_with_spline(xs, ys, n_extra_bins=1, n=100):
     ys_spl = list(ys)
 
 
+    r = ((ys_spl[0] / ys_spl[1]) - 1.0) / 2.0 + 1.0
+
     xs_spl.insert(0, xs_spl[0] - width / 2.0)
-    ys_spl.insert(0, ys_spl[0])
+    ys_spl.insert(0, ys_spl[0] * r)
 
     xs_spl.append(xs_spl[-1] + (n_extra_bins + 0.5) * width)
     ys_spl.append(0.0)
 
-    spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped")
+    x_spl = []
+    y_spl = []
+    spl = None
 
-    x_spl = np.linspace(0, xs_spl[-1], num=n * (len(xs) + n_extra_bins), endpoint=False)
-    y_spl = np.maximum(spl(x_spl), 0.0)
+    redo = True
+    while redo:
+        redo = False
 
-    x_spl = list(x_spl)
-    y_spl = list(y_spl)
+        spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped", k=3)
+
+        x_spl = np.linspace(0, xs_spl[-1], num=n * (len(xs) + n_extra_bins), endpoint=False)
+        y_spl = spl(x_spl)
+
+        for x, y in zip(x_spl, y_spl):
+            if y < 0 and x < xs_spl[-2]:
+                print("Found bad at", x, y)
+                redo = True
+
+                x_l = max([xx for xx in xs_spl if xx <= x])
+                x_r = min([xx for xx in xs_spl if xx > x])
+                y_l = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
+                y_r = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
+                i = [ii for ii, xx in enumerate(xs_spl) if xx==x_r][0]
+                xs_spl.insert(i, 0.5 * (x_l + x_r))
+                ys_spl.insert(i, 0.5 * (y_l + y_r))
+                break
+
+        y_spl = np.maximum(y_spl, 0.0)
+
+    x_spl = list([float(x) for x in x_spl])
+    y_spl = list([float(y) for y in y_spl])
 
     y_spl_scaled = []
 
