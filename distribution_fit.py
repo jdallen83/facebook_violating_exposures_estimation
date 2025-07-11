@@ -54,6 +54,10 @@ def chi2_fit(func, x, y, e, p):
     fit, hess_inv, infodict, errmsg, success = sp.optimize.leastsq(error_func, p, args=(np.array(x), np.array(y), np.array(e)), full_output=1)
     res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
 
+    if hess_inv is None or res_variance is None:
+        fit, hess_inv, infodict, errmsg, success = sp.optimize.leastsq(error_func, fit, args=(np.array(x), np.array(y), np.array(e)), full_output=1)
+        res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
+
     cov = hess_inv * res_variance
     return fit, cov
 
