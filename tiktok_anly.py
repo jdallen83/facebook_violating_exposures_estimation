@@ -131,28 +131,28 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
             histo_y_bins.append(float(rd['Result']))
             histo_e_bins.append(0.0005)
 
-    fit = distribution_fit.estimate_views_from_discrete_distribution(histo_x_bins, histo_y_bins, histo_e_bins, n=200, n_samples=30000, n_extra_bins=1, zero_frac=zero_frac)
+    fit = distribution_fit.estimate_views_of_histogram(histo_x_bins, histo_y_bins, histo_e_bins, n=100, n_samples=10000, n_extra_bins=1, zero_frac=zero_frac)
     if plot_dir is not None:
         histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
         histo_filetag = os.path.join(plot_dir, histo_filetag)
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_spline_with_0'], fit['curves_spline_with_0'], histo_filetag + '__spline', label=histo_label + ' [Spline]')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'], histo_filetag, label=histo_label + ' (Nor.)')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'], histo_filetag + '_spline_', label=histo_label + ' (Spl.)')
 
     r = {
         'lower_bound': low_limit,
         'upper_bound': high_limit,
         'middle_estimate': mid_est,
-        'full_range_lower_bound': fit['dist_total_min_views_with_0'],
-        'full_range_upper_bound': fit['dist_total_max_views_with_0'],
-        'estimated_views_per_video': fit['estimated_views_with_0'],
-        'estimated_views_per_video_uncertainty': fit['estimated_views_uncert_with_0'],
+        'full_range_lower_bound': fit['estimates_with_0']['Total Uncertainty'][0],
+        'full_range_upper_bound': fit['estimates_with_0']['Total Uncertainty'][2],
+        'estimated_views_per_video': fit['estimates_with_0']['Modeled (Normal)'][1],
+        'estimated_views_per_video_uncertainty': fit['estimates_with_0']['Modeled (Normal)'][2]-fit['estimates_with_0']['Modeled (Normal)'][1],
         'lower_bound_non0': low_limit / non_0_s,
         'upper_bound_non0': high_limit / non_0_s,
         'middle_estimate_non0': mid_est / non_0_s,
-        'full_range_lower_bound_non0': fit['dist_total_min_views'],
-        'full_range_upper_bound_non0': fit['dist_total_max_views'],
-        'estimated_views_per_video_non0': fit['estimated_views'],
-        'estimated_views_per_video_non0_uncertainty': fit['estimated_views_uncert'],
+        'full_range_lower_bound_non0': fit['estimates']['Total Uncertainty'][0],
+        'full_range_upper_bound_non0': fit['estimates']['Total Uncertainty'][2],
+        'estimated_views_per_video_non0': fit['estimates']['Modeled (Normal)'][1],
+        'estimated_views_per_video_non0_uncertainty': fit['estimates']['Modeled (Normal)'][2] - fit['estimates']['Modeled (Normal)'][1],
     }
     fit['returned_data'] = r
     fit['spline_estimate'] = estimate

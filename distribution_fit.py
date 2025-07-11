@@ -61,15 +61,6 @@ def chi2_fit(func, x, y, e, p):
 def fit_histogram_with_normal(xs, ys, es, n=100, n_extra_bins=1):
     d = xs[1] - xs[0]
 
-    # Now, if there are multiple training 0 bins, the fit+projection
-    # will get wonky (Due to rounding uncertainty).
-    # So truncate the distribution such that there
-    # is at most 1 trailing 0 bin.
-    while ys[-2]==0.0 and ys[-1]==0.0:
-        xs = xs[:-1]
-        ys = ys[:-1]
-        es = es[:-1]
-
     # Now, we want to function to fit the distribution, so fit to y*d
     fit_ys = [y * d for y in ys]
     fit_es = [e * d for e in es]
@@ -89,6 +80,9 @@ def fit_histogram_with_normal(xs, ys, es, n=100, n_extra_bins=1):
 
     best_fit_xs = np.linspace(xs[0]-d/2.0, xs[-1]+d/2.0+d*n_extra_bins, num=n*(len(xs)+n_extra_bins), endpoint=False)
     best_fit_ys = func(best_fit_xs, fit_p)
+
+    best_fit_xs = [float(x) for x in best_fit_xs]
+    best_fit_ys = [float(y) for y in best_fit_ys]
 
     return best_fit_xs, best_fit_ys
 
@@ -118,6 +112,9 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
 
         x_spl = np.linspace(0, xs_spl[-1], num=n * (len(xs) + n_extra_bins), endpoint=False)
         y_spl = spl(x_spl)
+
+        x_spl = [float(x) for x in x_spl]
+        y_spl = [float(y) for y in y_spl]
 
         for x, y in zip(x_spl, y_spl):
             if y < 0 and x < xs_spl[-2]:
@@ -196,6 +193,7 @@ def bin_stats_from_curves(xs, curve_x, curve_ys, n=100, n_extra_bins=1):
 
 
 def average_curves(curves):
+    lens = [len(curve) for curve in curves]
     pivot_curve = [[curve[i] for curve in curves] for i in range(len(curves[0]))]
     mean_curve = [float(np.mean(pc)) for pc in pivot_curve]
     std_curve = [float(np.std(pc)) for pc in pivot_curve]
@@ -371,11 +369,21 @@ def data_views(xs, ys, es, sample_ys, zero_frac=None):
 
 
 def estimate_views_using_model(xs, ys, es, model_func, n=100, n_samples=1000, n_extra_bins=1, zero_frac=None):
+    # Now, if there are multiple training 0 bins, the fit+projection
+    # will get wonky (Due to rounding uncertainty).
+    # So truncate the distribution such that there
+    # is at most 1 trailing 0 bin.
+    while ys[-2]==0.0 and ys[-1]==0.0:
+        xs = xs[:-1]
+        ys = ys[:-1]
+        es = es[:-1]
+
+
     sampled_ys = regenerate_distribution_within_errors(xs, ys, es, n=n_samples)
 
-    best_fit_x, best_fit_y = fit_histogram_with_normal(xs, ys, es, n=n, n_extra_bins=n_extra_bins)
+    best_fit_x, best_fit_y = model_func(xs, ys, es, n=n, n_extra_bins=n_extra_bins)
 
-    fits = [fit_histogram_with_normal(xs, cur_ys, es, n=n, n_extra_bins=n_extra_bins) for cur_ys in sampled_ys]
+    fits = [model_func(xs, cur_ys, es, n=n, n_extra_bins=n_extra_bins) for cur_ys in sampled_ys]
 
     fit_x, _ = fits[0]
     fit_ys = [fit_y for _, fit_y in fits]
@@ -430,6 +438,12 @@ def estimate_views_using_model(xs, ys, es, model_func, n=100, n_samples=1000, n_
 
 
 def estimate_views_of_histogram(xs, ys, es, n=100, n_samples=1000, n_extra_bins=1, zero_frac=None):
+    # Sort the histogram
+    srt = sorted(zip(xs, ys, es), key=lambda x: x[0], reverse=False)
+    xs = [x for x, y, e in srt]
+    ys = [y for x, y, e in srt]
+    es = [e for x, y, e in srt]
+
     # Normalize the histogram...
     width = xs[1] - xs[0]
     area = sum([y * width for y in ys])
@@ -452,14 +466,14 @@ def estimate_views_of_histogram(xs, ys, es, n=100, n_samples=1000, n_extra_bins=
         'Rounding Uncertainty': (data_estimates['dist_rounding_min_views'], data_estimates['dist_mid_views'], data_estimates['dist_rounding_max_views']),
         'Total Uncertainty': (data_estimates['dist_total_min_views'], data_estimates['dist_mid_views'], data_estimates['dist_total_max_views']),
         'Modeled (Normal)': (
-            normal_dist_fit['estimate'][0] - normal_dist_fit['estimate'][1],
+            max([normal_dist_fit['estimate'][0] - normal_dist_fit['estimate'][1], 0.0]),
             normal_dist_fit['estimate'][0],
             normal_dist_fit['estimate'][0] + normal_dist_fit['estimate'][1]
         ),
         'Modeled (Spline)': (
-            spline_dist_fit['estimate'][0] - normal_dist_fit['estimate'][1],
+            max([spline_dist_fit['estimate'][0] - spline_dist_fit['estimate'][1], 0.0]),
             spline_dist_fit['estimate'][0],
-            spline_dist_fit['estimate'][0] + normal_dist_fit['estimate'][1]
+            spline_dist_fit['estimate'][0] + spline_dist_fit['estimate'][1]
         )
     }
 
@@ -547,7 +561,7 @@ def plot_estimation_from_discrete_distribution(data, estimates, fit_bins, curves
     plot.plot([
         ('bar', xs, ys, {'color': 'tab:blue', 'width': 0.9, 'label': 'Provided Data', 'alpha': 0.6}),
         ('fill_between', curves['x'], curves['rescaled_fit_low'], curves['rescaled_fit_high'], {'alpha': 0.60, 'color': 'tab:orange', 'label': None}),
-        ('plot', curves['x'], curves['rescaled_fit'], {'color': 'tab:orange', 'label': 'Best Fit'}),
+        ('plot', curves['x'], curves['rescaled_fit'], {'color': 'tab:orange', 'label': 'Modeled Fit'}),
         ('errorbar', xs, ys, {'color': 'tab:blue', 'yerr': es, 'marker': 'o', 'linestyle': ''}),
         ],
         title="Modeled Views Distribution [{}]".format(label),
@@ -629,3 +643,69 @@ def plot_estimation_from_discrete_distribution(data, estimates, fit_bins, curves
         show=False,
         save="{}_View_Estimates.png".format(filetag)
     )
+
+
+if __name__=="__main__":
+    data = {
+    "x": [
+        0.5,
+        1.5,
+        2.5,
+        3.5,
+        4.5,
+        5.5,
+        6.5
+    ],
+    "y": [
+        0.005,
+        0.121,
+        0.028,
+        0.004,
+        0.006,
+        0.0,
+        0.0
+    ],
+    "es": [
+        0.0005,
+        0.0005,
+        0.0005,
+        0.0005,
+        0.0005,
+        0.0005,
+        0.0005
+    ],
+    "zero_frac": 0.835
+    }
+
+
+    xs = data['x']
+    ys = data['y']
+    es = data['es']
+    zero_frac = data['zero_frac']
+
+    n = 100
+    n_samples = 1000
+    n_extra_bins = 1
+
+    fit = estimate_views_of_histogram(xs, ys, es, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
+
+    plot_estimation_from_discrete_distribution(
+        fit['data'], fit['estimates'], fit['normal']['fit_bins'], fit['normal']['curves'],
+        '/tmp/test_norm_', label="normal w/o 0",
+    )
+
+    plot_estimation_from_discrete_distribution(
+        fit['data'], fit['estimates'], fit['spline']['fit_bins'], fit['spline']['curves'],
+        '/tmp/test_spline_', label="spline w/o 0",
+    )
+
+    plot_estimation_from_discrete_distribution(
+        fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'],
+        '/tmp/test_norm_w0_', label="normal w/ 0",
+    )
+
+    plot_estimation_from_discrete_distribution(
+        fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'],
+        '/tmp/test_spline_w0_', label="spline w/0",
+    )
+
