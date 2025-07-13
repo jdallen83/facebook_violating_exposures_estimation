@@ -120,6 +120,10 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
     xs_spl.append(xs_spl[-1] + (n_extra_bins + 0.5) * width)
     ys_spl.append(0.0)
 
+    while xs_spl[0] >= 0.5:
+        xs_spl.insert(0, xs_spl[0] - width / 2.0)
+        ys_spl.insert(0, ys_spl[0] * r)
+
     x_spl = []
     y_spl = []
     spl = None
@@ -139,9 +143,13 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
         for x, y in zip(x_spl, y_spl):
             if y < 0 and x < xs_spl[-2]:
                 redo = True
-
-                x_l = max([xx for xx in xs_spl if xx <= x])
-                x_r = min([xx for xx in xs_spl if xx > x])
+                try:
+                    x_l = max([xx for xx in xs_spl if xx <= x])
+                    x_r = min([xx for xx in xs_spl if xx > x])
+                except:
+                    print(xs_spl)
+                    print(x)
+                    raise ValueError
                 y_l = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
                 y_r = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
                 i = [ii for ii, xx in enumerate(xs_spl) if xx==x_r][0]
