@@ -131,9 +131,13 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
             histo_y_bins.append(float(rd['Result']))
             histo_e_bins.append(0.0005)
 
-    if os.path.isfile(histo_filetag + '__fitdata.json'):
-        doc = json.load(open(histo_filetag + '__fitdata.json'))
-        return doc['returned_data']
+    if plot_dir is not None:
+        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
+        histo_filetag = os.path.join(plot_dir, histo_filetag)
+
+        if os.path.isfile(histo_filetag + '__fitdata.json'):
+            doc = json.load(open(histo_filetag + '__fitdata.json'))
+            return doc['returned_data']
 
     fit = distribution_fit.estimate_views_of_histogram(histo_x_bins, histo_y_bins, histo_e_bins, n=100, n_samples=10000, n_extra_bins=1, zero_frac=zero_frac)
     if plot_dir is not None:
