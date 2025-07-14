@@ -140,12 +140,17 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
             histo_x_bins.append(bucket['p'])
             histo_y_bins.append(float(rd['pct']))
             histo_e_bins.append(0.00005)
-    fit = distribution_fit.estimate_views_from_discrete_distribution(histo_x_bins, histo_y_bins, histo_e_bins, n=200, n_samples=50000, n_extra_bins=1, zero_frac=zero_frac)
+    fit = distribution_fit.estimate_views_of_histogram(histo_x_bins, histo_y_bins, histo_e_bins, n=100, n_samples=50000, n_extra_bins=1, zero_frac=zero_frac)
+
     if plot_dir is not None:
         histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
         histo_filetag = os.path.join(plot_dir, histo_filetag)
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_spline_with_0'], fit['curves_spline_with_0'], histo_filetag + '__spline', label=histo_label + ' [Spline]')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'], histo_filetag, label=histo_label + ' (Nor.)')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'], histo_filetag + '_spline_', label=histo_label + ' (Spl.)')
+#        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
+#        histo_filetag = os.path.join(plot_dir, histo_filetag)
+#        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
+#        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_spline_with_0'], fit['curves_spline_with_0'], histo_filetag + '__spline', label=histo_label + ' [Spline]')
 
     r = {
         'lower_bound': low_limit,
