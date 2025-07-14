@@ -72,9 +72,17 @@ def chi2_fit(func, x, y, e, p):
         print(infodict)
         print(errmsg)
         print(success)
-        raise ValueError
-
-    cov = hess_inv * res_variance
+        print(res_variance)
+        if 'are at most 0.000000 and the relative error between two consecutive iterates is at' in errmsg:
+            cov = None
+        elif 'Both actual and predicted relative reductions in the sum of squares' in errmsg:
+            cov = None
+        elif 'The cosine of the angle between func(x) and any column of the' in errmsg:
+            cov = None
+        else:
+            raise ValueError
+    else:
+        cov = hess_inv * res_variance
     return fit, cov
 
 
@@ -124,6 +132,13 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
         xs_spl.insert(0, xs_spl[0] - width / 2.0)
         ys_spl.insert(0, ys_spl[0] * r)
 
+
+    min_x_for_zero = -1.0
+    for x, y in zip(xs_spl, ys_spl):
+        if y > 0.0:
+            break
+        min_x_for_zero = x + width / 2.0
+
     x_spl = []
     y_spl = []
     spl = None
@@ -132,7 +147,13 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
     while redo:
         redo = False
 
-        spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped", k=3)
+        try:
+            spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped", k=3)
+        except:
+            print("Failed to fit spline")
+            print(xs_spl)
+            print(ys_spl)
+            raise ValueError
 
         x_spl = np.linspace(0, xs_spl[-1], num=n * (len(xs) + n_extra_bins), endpoint=False)
         y_spl = spl(x_spl)
@@ -141,7 +162,7 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
         y_spl = [float(y) for y in y_spl]
 
         for x, y in zip(x_spl, y_spl):
-            if y < 0 and x < xs_spl[-2]:
+            if y < 0 and x < xs_spl[-2] and x >= min_x_for_zero:
                 redo = True
                 try:
                     x_l = max([xx for xx in xs_spl if xx <= x])
