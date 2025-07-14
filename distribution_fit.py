@@ -137,7 +137,7 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
     for x, y in zip(xs_spl, ys_spl):
         if y > 0.0:
             break
-        min_x_for_zero = x + width / 2.0
+        min_x_for_zero = x + width
 
     x_spl = []
     y_spl = []
