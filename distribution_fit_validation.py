@@ -137,6 +137,15 @@ if __name__=="__main__":
         parsed_doc['data_xs'] = [x for x, y, e in xye]
         parsed_doc['data_ys'] = [y for x, y, e in xye]
         parsed_doc['data_es'] = [e for x, y, e in xye]
+
+        while parsed_doc['data_ys'][-1]==0.0 and parsed_doc['data_ys'][-2]==0.0:
+            # In these cases, the fit histogram was trimmed.
+            # So need to repeat this, or else the validated one will
+            # Extend out too far
+            parsed_doc['data_xs'] = parsed_doc['data_xs'][:-1]
+            parsed_doc['data_ys'] = parsed_doc['data_ys'][:-1]
+            parsed_doc['data_es'] = parsed_doc['data_es'][:-1]
+
         sampled_histograms = {}
         fits = {}
         for curve in ('fit_curve_normal_rescaled', 'fit_curve_spline_rescaled', 'fit_curve_normal', 'fit_curve_spline'):

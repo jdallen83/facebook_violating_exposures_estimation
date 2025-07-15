@@ -159,3 +159,28 @@ def plot(plots, show=False, save=None, figsize=(16*0.5, 9*0.5), xlabel=None, yla
         pl.savefig(save, dpi=dpi)
     if show:
         pl.show()
+
+
+
+def histogram(samples, min_x=None, max_x=None, n=10):
+    if min_x is None:
+        min_x = min(samples) * 1.0
+    if max_x is None:
+        max_x = max(samples) * 1.0
+
+    d = (max_x - min_x) * 1.0 / n
+
+    ys = []
+    xs = []
+
+    for i in range(n):
+        cmin = i * d
+        cmax = (i + 1) * d
+        xs.append((cmin+cmax)*0.5)
+        ys.append(
+            len([s for s in samples if s>=cmin and s<cmax])
+        )
+        if i==n-1:
+            ys[-1] = ys[-1] + len([s for s in samples if s==cmax])
+
+    return xs, ys
