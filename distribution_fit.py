@@ -79,6 +79,8 @@ def chi2_fit(func, x, y, e, p):
             cov = None
         elif 'The cosine of the angle between func(x) and any column of the' in errmsg:
             cov = None
+        elif 'The relative error between two consecutive iterates is at most 0.000000' in errmsg:
+            cov = None
         else:
             raise ValueError
     else:

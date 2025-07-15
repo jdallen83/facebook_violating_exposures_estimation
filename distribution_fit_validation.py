@@ -137,6 +137,7 @@ if __name__=="__main__":
         parsed_doc['data_xs'] = [x for x, y, e in xye]
         parsed_doc['data_ys'] = [y for x, y, e in xye]
         parsed_doc['data_es'] = [e for x, y, e in xye]
+        sampled_histograms = {}
         fits = {}
         for curve in ('fit_curve_normal_rescaled', 'fit_curve_spline_rescaled', 'fit_curve_normal', 'fit_curve_spline'):
             print("\t", curve)
