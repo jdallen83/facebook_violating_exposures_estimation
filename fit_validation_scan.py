@@ -76,7 +76,7 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     hist_rounded = [round(y, rounding) for y in hist_normed]
     hist_uncert = [5 * 10**(-1 * (rounding + 1)) for y in hist_rounded]
 
-    fit = df.estimate_views_of_histogram(x_bins, hist_rounded, hist_uncert, n=100, n_samples=5000, n_extra_bins=n_extra_bins, zero_frac=0.0)
+    fit = df.estimate_views_of_histogram(x_bins, hist_rounded, hist_uncert, n=100, n_samples=15000, n_extra_bins=n_extra_bins, zero_frac=0.0)
 
     r_doc = {
         'true_average': avg,
@@ -86,6 +86,17 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
         'true_histogram_y': [float(v) for v in hist_rounded],
         'true_histogram_e': [float(v) for v in hist_uncert],
         'fit': fit,
+        'run_params': {
+            'u': u,
+            'l': l,
+            'x_min': x_min,
+            'x_max': x_max,
+            'x_hist_max': x_hist_max,
+            'hist_bin_width': hist_bin_width,
+            'n_hist_samples': n_hist_samples,
+            'rounding': rounding,
+            'n_extra_bins': n_extra_bins,
+        }
     }
 
     if cache_dir is not None:
@@ -95,6 +106,8 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 
 
 def fit_simulation_run_wrap(doc, cache_dir=None):
+    if 'status_print' in doc:
+        print(doc['status_print'])
     return fit_simulation_run(
         doc['u'], doc['l'],
         0.0, doc['sample_x_max'],
@@ -167,8 +180,9 @@ if __name__=="__main__":
     n_processes = int(sys.argv[2]) if len(sys.argv) >= 3 else None
 
     final_runs = []
-    for r in ALL_RUNS:
+    for i, r in enumerate(ALL_RUNS):
         r['cache_dir'] = cache_dir
+        r['status_print'] = "({}/{})".format(i, len(ALL_RUNS))
         final_runs.append(r)
 
     if n_processes is None:
