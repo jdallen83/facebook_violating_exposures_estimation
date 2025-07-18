@@ -164,7 +164,7 @@ if __name__=="__main__":
     from multiprocessing import Pool
 
     cache_dir = sys.argv[1]
-    n_processes = sys.argv[2] if len(sys.argv) >= 3 else None
+    n_processes = int(sys.argv[2]) if len(sys.argv) >= 3 else None
 
     func = lambda x: fit_simulation_run_wrap(x, cache_dir=cache_dir)
 
