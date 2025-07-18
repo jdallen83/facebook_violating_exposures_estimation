@@ -60,7 +60,8 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 
     bin_ids = np.digitize(samples, bins_for_np)
     hist = {int(k): v for k, v in collections.Counter(bin_ids).items()}
-    for i in range(bins_for_np):
+
+    for i in range(len(bins_for_np)):
         if i not in hist:
             hist[i] = 0
 
