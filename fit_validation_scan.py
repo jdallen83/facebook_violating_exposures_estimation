@@ -166,11 +166,14 @@ if __name__=="__main__":
     cache_dir = sys.argv[1]
     n_processes = int(sys.argv[2]) if len(sys.argv) >= 3 else None
 
-    func = lambda x: fit_simulation_run_wrap(x, cache_dir=cache_dir)
+    final_runs = []
+    for r in ALL_RUNS:
+        r['cache_dir'] = cache_dir
+        final_runs.append(r)
 
     if n_processes is None:
         with Pool() as p:
-            p.map(func, ALL_RUNS)
+            p.map(fit_simulation_run_wrap, ALL_RUNS)
     else:
         with Pool(n_processes) as p:
-            p.map(func, ALL_RUNS)
+            p.map(fit_simulation_run_wrap, ALL_RUNS)
