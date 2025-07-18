@@ -9,9 +9,44 @@ import facebook_violating_exposures_estimation.distribution_fit as distribution_
 import facebook_violating_exposures_estimation.plot as plot
 
 
-def sample_curve(curve_x, curve_y):
+def sample_curve(curve_x, curve_y, n=1):
     d = curve_x[1] - curve_x[0]
-    r = random.random()
+    area = sum(curve_y) * d
+    curve_y_n = [y / area for y in curve_y]
+
+    sum_curve = []
+    run_sum = 0.0
+    for y in curve_y_n:
+        run_sum += y * d
+        sum_curve.append(run_sum)
+
+    samples = []
+
+    rs = [random.random() for i in range(n)]
+    max_iis = [max([ii for ii, y in enumerate(sum_curve) if y < r]) if r > sum_curve[0] else None for r in rs]
+    #max_iis = [max(ii) if len(ii) else None for ii in iis]
+    x_samples = [r / sum_curve[0] * d + curve_x[0] if ii is None else (r - sum_curve[ii]) / (d * curve_y[ii+1]) * d + curve_x[ii+1] for r, ii in zip(rs, max_iis)]
+
+    if n==1:
+        return x_samples[0]
+    else:
+        return x_samples
+
+    for i in range(n):
+        r = random.random()
+        ii = [ii for ii, y in enumerate(sum_curve) if y < r]
+        if len(ii)==0:
+            x = r / sum_curve[0] * d + curve_x[0]
+        else:
+            ii = max(ii)
+            a = r - sum_curve[ii]
+            x = a / (d * curve_y[ii+1]) * d + curve_x[ii+1]
+        samples.append(x)
+
+    if n==1:
+        return samples[0]
+    else:
+        return samples
 
     i = 0
     s = 0.0

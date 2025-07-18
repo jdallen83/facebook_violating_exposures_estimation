@@ -174,8 +174,8 @@ def histogram(samples, min_x=None, max_x=None, n=10):
     xs = []
 
     for i in range(n):
-        cmin = i * d
-        cmax = (i + 1) * d
+        cmin = i * d + min_x
+        cmax = (i + 1) * d + min_x
         xs.append((cmin+cmax)*0.5)
         ys.append(
             len([s for s in samples if s>=cmin and s<cmax])
