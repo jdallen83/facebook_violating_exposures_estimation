@@ -161,6 +161,7 @@ ALL_RUNS = YT_RUNS + TT_RUNS
 
 if __name__=="__main__":
     import sys
+    from multiprocessing import Pool
 
     cache_dir = sys.argv[1]
     n_processes = sys.argv[2] if len(sys.argv) >= 3 else None
