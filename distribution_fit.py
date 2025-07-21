@@ -61,7 +61,7 @@ def chi2_fit(func, x, y, e, p):
         else:
             break
 
-    if hess_inv is None or res_variance is None:
+    if (hess_inv is None or res_variance is None) and 'Number of calls to function has reached maxfev = 800' not in errmsg:
         print("ERROR: BAD CHI2 FIT")
         print(x)
         print(y)
@@ -81,8 +81,12 @@ def chi2_fit(func, x, y, e, p):
             cov = None
         elif 'The relative error between two consecutive iterates is at most 0.000000' in errmsg:
             cov = None
+        elif 'Number of calls to function has reached maxfev = 800' in errmsg:
+            cov = None
         else:
             raise ValueError
+    elif hess_inv is None or res_variance is None and 'Number of calls to function has reached maxfev = 800' in errmsg:
+        cov = None
     else:
         cov = hess_inv * res_variance
     return fit, cov
