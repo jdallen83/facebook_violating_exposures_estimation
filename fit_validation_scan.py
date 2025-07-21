@@ -109,14 +109,17 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 def fit_simulation_run_wrap(doc, cache_dir=None):
     if 'status_print' in doc:
         print(doc['status_print'])
-    return fit_simulation_run(
-        doc['u'], doc['l'],
-        0.0, doc['sample_x_max'],
-        doc['bin_max'], doc['bin_width'],
-        doc.get('n_hist_samples', 300000000),
-        doc['rounding'], doc['n_extra_bins'],
-        cache_dir=doc.get('cache_dir', cache_dir),
-    )
+    try:
+        return fit_simulation_run(
+            doc['u'], doc['l'],
+            0.0, doc['sample_x_max'],
+            doc['bin_max'], doc['bin_width'],
+            doc.get('n_hist_samples', 300000000),
+            doc['rounding'], doc['n_extra_bins'],
+            cache_dir=doc.get('cache_dir', cache_dir),
+        )
+    except:
+        return None
 
 
 YOUTUBE_US = [-3.0]
