@@ -124,7 +124,10 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
     xs_spl = list(xs)
     ys_spl = list(ys)
 
-    r = ((ys_spl[0] / ys_spl[1]) - 1.0) / 2.0 + 1.0
+    if ys_spl[1]!=0.0:
+        r = ((ys_spl[0] / ys_spl[1]) - 1.0) / 2.0 + 1.0
+    else:
+        r = 1.0
 
     xs_spl.insert(0, xs_spl[0] - width / 2.0)
     ys_spl.insert(0, ys_spl[0] * r)
