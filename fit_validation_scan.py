@@ -180,6 +180,7 @@ ALL_RUNS = YT_RUNS + TT_RUNS
 
 if __name__=="__main__":
     import sys
+    import random
     from multiprocessing import Pool
 
     cache_dir = sys.argv[1]
@@ -190,6 +191,8 @@ if __name__=="__main__":
         r['cache_dir'] = cache_dir
         r['status_print'] = "({}/{})".format(i, len(ALL_RUNS))
         final_runs.append(r)
+
+    random.shuffle(final_runs)
 
     if n_processes is None:
         with Pool() as p:
