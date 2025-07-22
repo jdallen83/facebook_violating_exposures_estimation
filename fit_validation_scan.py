@@ -119,6 +119,8 @@ def fit_simulation_run_wrap(doc, cache_dir=None):
             cache_dir=doc.get('cache_dir', cache_dir),
         )
     except:
+        print("FAILURE")
+        print(json.dumps(doc, indent=2))
         return None
 
 
@@ -191,7 +193,7 @@ if __name__=="__main__":
 
     if n_processes is None:
         with Pool() as p:
-            p.map(fit_simulation_run_wrap, ALL_RUNS)
+            p.map(fit_simulation_run_wrap, final_runs)
     else:
         with Pool(n_processes) as p:
-            p.map(fit_simulation_run_wrap, ALL_RUNS)
+            p.map(fit_simulation_run_wrap, final_runs)

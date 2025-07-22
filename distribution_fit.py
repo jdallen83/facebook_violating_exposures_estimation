@@ -167,7 +167,6 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
 
         for x, y in zip(x_spl, y_spl):
             if y < 0 and x < xs_spl[-2] and x >= min_x_for_zero:
-                redo = True
                 try:
                     x_l = max([xx for xx in xs_spl if xx <= x])
                     x_r = min([xx for xx in xs_spl if xx > x])
@@ -177,9 +176,12 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
                     raise ValueError
                 y_l = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
                 y_r = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
+                if y_l==0.0 and y_r==0.0:
+                    break
                 i = [ii for ii, xx in enumerate(xs_spl) if xx==x_r][0]
                 xs_spl.insert(i, 0.5 * (x_l + x_r))
                 ys_spl.insert(i, 0.5 * (y_l + y_r))
+                redo = True
                 break
 
         y_spl = np.maximum(y_spl, 0.0)
