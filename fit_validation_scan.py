@@ -139,9 +139,9 @@ TIKTOK_LS = [round(l, 3) for l in TIKTOK_LS]
 
 N_EXTRA_BINS = [0, 1, 2, 3]
 BIN_WIDTHS = [0.1, 0.5, 1.0]
-BIN_MAX = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+BIN_MAX = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 SAMPLE_X_MAX = [9.0]
-ROUNDING = [2, 3, 4, 5]
+ROUNDING = [2, 3, 4, 5, 12]
 
 
 RUNS = []
