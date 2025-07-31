@@ -205,7 +205,7 @@ def get_manual_runs(infiles):
         for run in RUNS:
             r = dict(run)
             r['u'] = infile.split('[')[-1].split('-')[0]
-            r['l'] = infile.split(']')[-2].split('-')[1].replace('_', ' ').strip().replace(' ', '_')
+            r['l'] = infile.split(']')[-2].split('-')[-1].replace('_', ' ').strip().replace(' ', '_')
             r['manual_x'] = manual_x
             r['manual_y'] = manual_y
             MANUAL_RUNS.append(r)
