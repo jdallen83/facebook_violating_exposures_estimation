@@ -138,7 +138,7 @@ def manual_x_y_from_fitdata(infile, fit_type='spline'):
     x = doc[fit_type]['curves']['x']
     y = doc[fit_type]['curves']['rescaled_fit']
     d = x[1] - x[0]
-    a = sum(y) * d
+    a = sum(y)
     ys_norm = [yy / a for yy in y]
     x_sels = [xx + 0.5 * d for xx in x]
 
