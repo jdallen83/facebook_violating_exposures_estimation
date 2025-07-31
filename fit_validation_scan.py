@@ -132,11 +132,11 @@ def fit_simulation_run_wrap(doc, cache_dir=None):
         return None
 
 
-def manual_x_y_from_fitdata(infile):
+def manual_x_y_from_fitdata(infile, fit_type='spline'):
     doc = json.load(open(INFILE))
 
-    x = doc['spline']['curves']['x']
-    y = doc['spline']['curves']['rescaled_fit']
+    x = doc[fit_type]['curves']['x']
+    y = doc[fit_type]['curves']['rescaled_fit']
     d = x[1] - x[0]
     a = sum(y) * d
     ys_norm = [yy / a for yy in y]
