@@ -22,7 +22,7 @@ L_MEAN_YT = 2.182037045531944
 L_STD_YT = 0.1261763156535121
 
 
-def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, cache_dir=None):
+def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None):
     cache_file = "SIM_{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
         u, l, x_min, x_max, x_hist_max,
         hist_bin_width, n_hist_samples,
@@ -34,14 +34,18 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 
     print(cache_file)
 
-    xs = np.linspace(x_min, x_max, num=round(100 * (x_max - x_min)), endpoint=False)
-    d = xs[1] - xs[0]
-    ys = df.normal_distribution(xs, [u, l, 1.0])
-    area = d * sum(ys)
-    ys = [y / area for y in ys]
+    if manual_x is None or manual_y is None:
+        xs = np.linspace(x_min, x_max, num=round(100 * (x_max - x_min)), endpoint=False)
+        d = xs[1] - xs[0]
+        ys = df.normal_distribution(xs, [u, l, 1.0])
+        area = d * sum(ys)
+        ys = [y / area for y in ys]
 
-    x_sels = [x + d/2.0 for x in xs]
-    ys_norm = [y * d for y in ys]
+        x_sels = [x + d/2.0 for x in xs]
+        ys_norm = [y * d for y in ys]
+    else:
+        x_sels = manual_x
+        ys_norm = manual_y
 
     samples = None
     avg = None
@@ -97,6 +101,8 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
             'n_hist_samples': n_hist_samples,
             'rounding': rounding,
             'n_extra_bins': n_extra_bins,
+            'manual_x': manual_x,
+            'manual_y': manual_y,
         }
     }
 
@@ -117,11 +123,26 @@ def fit_simulation_run_wrap(doc, cache_dir=None):
             doc.get('n_hist_samples', 300000000),
             doc['rounding'], doc['n_extra_bins'],
             cache_dir=doc.get('cache_dir', cache_dir),
+            manual_x=doc.get('manual_x', None),
+            manual_y=doc.get('manual_y', None),
         )
     except:
         print("FAILURE")
         print(json.dumps(doc, indent=2))
         return None
+
+
+def manual_x_y_from_fitdata(infile):
+    doc = json.load(open(INFILE))
+
+    x = doc['spline']['curves']['x']
+    y = doc['spline']['curves']['rescaled_fit']
+    d = x[1] - x[0]
+    a = sum(y) * d
+    ys_norm = [yy / a for yy in y]
+    x_sels = [xx + 0.5 * d for xx in x]
+
+    return x_sels, ys_norm
 
 
 YOUTUBE_US = [-3.0]
@@ -175,6 +196,23 @@ for u in TIKTOK_US:
             r['l'] = l
             TT_RUNS.append(r)
 
+def get_manual_runs(infiles):
+    global RUNS
+
+    MANUAL_RUNS = []
+    for infile in infiles:
+        manual_x, manual_y = manual_x_y_from_fitdata(infile)
+        for run in RUNS:
+            r = dict(run)
+            r['u'] = infile.split('[')[-1].split('-')[0]
+            r['l'] = infile.split(']')[-2].split('-')[1].replace('_', ' ').strip().replace(' ', '_')
+            r['manual_x'] = manual_x
+            r['manual_y'] = manual_y
+            MANUAL_RUNS.append(r)
+
+    return MANUAL_RUNS
+
+
 ALL_RUNS = YT_RUNS + TT_RUNS
 
 
@@ -185,6 +223,12 @@ if __name__=="__main__":
 
     cache_dir = sys.argv[1]
     n_processes = int(sys.argv[2]) if len(sys.argv) >= 3 else None
+
+    manual_files = []
+    if len(sys.argv) >= 4:
+        manual_files = sys.argv[3:]
+
+    ALL_RUNS += get_manual_runs(manual_files)
 
     final_runs = []
     for i, r in enumerate(ALL_RUNS):
