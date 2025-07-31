@@ -133,7 +133,7 @@ def fit_simulation_run_wrap(doc, cache_dir=None):
 
 
 def manual_x_y_from_fitdata(infile, fit_type='spline'):
-    doc = json.load(open(INFILE))
+    doc = json.load(open(infile))
 
     x = doc[fit_type]['curves']['x']
     y = doc[fit_type]['curves']['rescaled_fit']
