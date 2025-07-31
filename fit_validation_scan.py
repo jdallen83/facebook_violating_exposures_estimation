@@ -107,14 +107,16 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     }
 
     if cache_dir is not None:
+        print("WRITING TO")
+        print("\t", os.path.join(cache_dir, cache_file))
         json.dump(r_doc, open(os.path.join(cache_dir, cache_file), 'w'), indent=2)
 
     return r_doc
 
 
 def fit_simulation_run_wrap(doc, cache_dir=None):
-    #if 'status_print' in doc:
-    #    print(doc['status_print'])
+    if 'status_print' in doc:
+        print(doc['status_print'])
     #try:
     return fit_simulation_run(
         doc['u'], doc['l'],
