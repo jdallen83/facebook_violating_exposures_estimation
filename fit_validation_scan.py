@@ -58,7 +58,6 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 
     samples = np.random.choice(x_sels, p=ys_norm, size=n_hist_samples)
     avg = sum(10**samples) * 1.0 / n_hist_samples
-    print("Average:", avg)
 
     x_bins = []
     x = hist_bin_width / 2.0
@@ -113,8 +112,6 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     }
 
     if cache_dir is not None:
-        print("WRITING TO")
-        print("\t", os.path.join(cache_dir, cache_file))
         json.dump(r_doc, open(os.path.join(cache_dir, cache_file), 'w'), indent=2)
 
     return r_doc
@@ -123,21 +120,21 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 def fit_simulation_run_wrap(doc, cache_dir=None):
     if 'status_print' in doc:
         print(doc['status_print'])
-    #try:
-    return fit_simulation_run(
-        doc['u'], doc['l'],
-        0.0, doc['sample_x_max'],
-        doc['bin_max'], doc['bin_width'],
-        doc.get('n_hist_samples', 300000000),
-        doc['rounding'], doc['n_extra_bins'],
-        cache_dir=doc.get('cache_dir', cache_dir),
-        manual_x=doc.get('manual_x', None),
-        manual_y=doc.get('manual_y', None),
-    )
-#    except:
-#        print("FAILURE")
-#        print(json.dumps(doc, indent=2))
-#        return None
+    try:
+        return fit_simulation_run(
+            doc['u'], doc['l'],
+            0.0, doc['sample_x_max'],
+            doc['bin_max'], doc['bin_width'],
+            doc.get('n_hist_samples', 300000000),
+            doc['rounding'], doc['n_extra_bins'],
+            cache_dir=doc.get('cache_dir', cache_dir),
+            manual_x=doc.get('manual_x', None),
+            manual_y=doc.get('manual_y', None),
+        )
+    except:
+        print("FAILURE")
+        print(json.dumps(doc, indent=2))
+        return None
 
 
 def manual_x_y_from_fitdata(infile, fit_type='spline'):
