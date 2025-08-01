@@ -108,6 +108,7 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
             'n_extra_bins': n_extra_bins,
             'manual_x': manual_x,
             'manual_y': manual_y,
+            'tag': tag,
         }
     }
 
@@ -236,7 +237,7 @@ if __name__=="__main__":
     if len(sys.argv) >= 4:
         manual_files = sys.argv[3:]
 
-    ALL_RUNS += get_manual_runs(manual_files)
+    ALL_RUNS += get_manual_runs(manual_files, 'spline')
     ALL_RUNS += get_manual_runs(manual_files, 'normal')
 
     final_runs = []
