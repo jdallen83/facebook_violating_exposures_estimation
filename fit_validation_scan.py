@@ -22,9 +22,9 @@ L_MEAN_YT = 2.182037045531944
 L_STD_YT = 0.1261763156535121
 
 
-def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None):
-    cache_file = "SIM_{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
-        u, l, x_min, x_max, x_hist_max,
+def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None, tag=None):
+    cache_file = "SIM_{}{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
+        tag or '', u, l, x_min, x_max, x_hist_max,
         hist_bin_width, n_hist_samples,
         n_extra_bins, rounding,
     )
@@ -130,6 +130,7 @@ def fit_simulation_run_wrap(doc, cache_dir=None):
             cache_dir=doc.get('cache_dir', cache_dir),
             manual_x=doc.get('manual_x', None),
             manual_y=doc.get('manual_y', None),
+            tag=doc.get('tag', None),
         )
     except:
         print("FAILURE")
@@ -201,7 +202,7 @@ for u in TIKTOK_US:
             r['l'] = l
             TT_RUNS.append(r)
 
-def get_manual_runs(infiles):
+def get_manual_runs(infiles, fit_type='spline'):
     global RUNS
 
     MANUAL_RUNS = []
@@ -213,6 +214,8 @@ def get_manual_runs(infiles):
             r['l'] = infile.split(']')[-2].split('-')[-1].replace('_', ' ').strip().replace(' ', '_')
             r['manual_x'] = manual_x
             r['manual_y'] = manual_y
+            if fit_type=='normal':
+                r['tag'] = 'normal_'
             MANUAL_RUNS.append(r)
 
     return MANUAL_RUNS
@@ -234,6 +237,7 @@ if __name__=="__main__":
         manual_files = sys.argv[3:]
 
     ALL_RUNS += get_manual_runs(manual_files)
+    ALL_RUNS += get_manual_runs(manual_files, 'normal')
 
     final_runs = []
     for i, r in enumerate(ALL_RUNS):
