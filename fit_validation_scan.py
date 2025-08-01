@@ -164,6 +164,8 @@ def get_manual_runs(infiles, runs, fit_type='spline'):
             r['manual_y'] = manual_y
             if fit_type=='normal':
                 r['tag'] = 'normal_'
+            elif fit_type=='spline':
+                r['tag'] = 'spline_'
             MANUAL_RUNS.append(r)
 
     return MANUAL_RUNS
