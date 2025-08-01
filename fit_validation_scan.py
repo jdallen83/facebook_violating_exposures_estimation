@@ -34,6 +34,8 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 
     print(cache_file)
 
+    xs = None
+    ys = None
     if manual_x is None or manual_y is None:
         xs = np.linspace(x_min, x_max, num=round(100 * (x_max - x_min)), endpoint=False)
         d = xs[1] - xs[0]
@@ -46,6 +48,10 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     else:
         x_sels = manual_x
         ys_norm = manual_y
+        xs = manual_x
+        d = xs[1] - xs[0]
+        area = sum(ys_norm) * d
+        ys = [y / area for y in ys_norm]
 
     samples = None
     avg = None
