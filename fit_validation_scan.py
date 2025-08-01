@@ -152,6 +152,23 @@ def manual_x_y_from_fitdata(infile, fit_type='spline'):
     return x_sels, ys_norm
 
 
+def get_manual_runs(infiles, runs, fit_type='spline'):
+    MANUAL_RUNS = []
+    for infile in infiles:
+        manual_x, manual_y = manual_x_y_from_fitdata(infile)
+        for run in runs:
+            r = dict(run)
+            r['u'] = infile.split('[')[-1].split('-')[0]
+            r['l'] = infile.split(']')[-2].split('-')[-1].replace('_', ' ').strip().replace(' ', '_')
+            r['manual_x'] = manual_x
+            r['manual_y'] = manual_y
+            if fit_type=='normal':
+                r['tag'] = 'normal_'
+            MANUAL_RUNS.append(r)
+
+    return MANUAL_RUNS
+
+
 YOUTUBE_US = [-3.0]
 YOUTUBE_LS = [
     L_MEAN_YT - L_STD_YT,
@@ -203,24 +220,6 @@ for u in TIKTOK_US:
             r['l'] = l
             TT_RUNS.append(r)
 
-def get_manual_runs(infiles, fit_type='spline'):
-    global RUNS
-
-    MANUAL_RUNS = []
-    for infile in infiles:
-        manual_x, manual_y = manual_x_y_from_fitdata(infile)
-        for run in RUNS:
-            r = dict(run)
-            r['u'] = infile.split('[')[-1].split('-')[0]
-            r['l'] = infile.split(']')[-2].split('-')[-1].replace('_', ' ').strip().replace(' ', '_')
-            r['manual_x'] = manual_x
-            r['manual_y'] = manual_y
-            if fit_type=='normal':
-                r['tag'] = 'normal_'
-            MANUAL_RUNS.append(r)
-
-    return MANUAL_RUNS
-
 
 ALL_RUNS = YT_RUNS + TT_RUNS
 
@@ -237,8 +236,8 @@ if __name__=="__main__":
     if len(sys.argv) >= 4:
         manual_files = sys.argv[3:]
 
-    ALL_RUNS += get_manual_runs(manual_files, 'spline')
-    ALL_RUNS += get_manual_runs(manual_files, 'normal')
+    ALL_RUNS += get_manual_runs(manual_files, RUNS, 'spline')
+    ALL_RUNS += get_manual_runs(manual_files, RUNS, 'normal')
 
     final_runs = []
     for i, r in enumerate(ALL_RUNS):
