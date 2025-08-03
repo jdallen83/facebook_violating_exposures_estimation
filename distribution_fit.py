@@ -233,6 +233,8 @@ def bin_stats_from_curves(xs, curve_x, curve_ys, n=100, n_extra_bins=1):
 
         areas = [sum(curve_y[i_l:i_h])*d for curve_y in curve_ys]
         mean_xs = [sum([x*y*d for x, y in zip(curve_x[i_l:i_h], curve_y[i_l:i_h])]) / a if a > 0.0 else 0.0 for curve_y, a in zip(curve_ys, areas)]
+        mean_curve_views = [sum([(10**(x+d/2.0))*y*d for x, y in zip(curve_x[i_l:i_h], curve_y[i_l:i_h])]) / a if a > 0.0 else 0.0 for curve_y, a in zip(curve_ys, areas)]
+        curve_views = [a * mcv for mcv, a in zip(mean_curve_views, areas)]
         views = [a * 10**x for x, a in zip(mean_xs, areas)]
 
         mb = {
@@ -241,8 +243,12 @@ def bin_stats_from_curves(xs, curve_x, curve_ys, n=100, n_extra_bins=1):
             'weight_std': float(np.std(areas)),
             'log_10_views_mean': float(np.mean(mean_xs)),
             'log_10_views_std': float(np.mean(mean_xs)),
-            'weighted_views_mean': float(np.mean(views)),
-            'weighted_views_std': float(np.std(views)),
+            'weighted_views_log10_mean': float(np.mean(views)),
+            'weighted_views_log10_std': float(np.std(views)),
+            'weighted_curve_estimated_views_mean': float(np.mean(curve_views)),
+            'weighted_curve_estimated_views_std': float(np.std(curve_views)),
+            'weighted_views_mean': float(np.mean(curve_views)),
+            'weighted_views_std': float(np.std(curve_views)),
         }
         mean_bins.append(mb)
 

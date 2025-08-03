@@ -8,7 +8,7 @@ import facebook_violating_exposures_estimation.distribution_fit as distribution_
 
 
 def comp_doc(doc, comp):
-    c = {k: comp[k]==doc[k] for k in comp.keys()}
+    c = {k: comp[k]==doc.get(k) for k in comp.keys()}
     return False not in c.values()
 
 
@@ -131,12 +131,13 @@ def plot_dep_key_behavior(ul, filter_doc, docs, dep_key, dep_key_label, label, f
         #xlim=[0, None],
         #ylim=[0, None],
         padding=0.5,
-        save=os.path.join(dir, 'dep_key_plot_{}_{}_{}_u{}_l{}.png'.format(
+        save=os.path.join(dir, 'dep_key_plot_{}_{}_{}_u{}_l{}{}.png'.format(
             dep_key,
             label.lower().replace(' ', '_'),
             fit_type.lower(),
             ul['u'],
             ul['l'],
+            ul.get('tag', ''),
         )),
     )
 
@@ -160,8 +161,10 @@ if __name__=="__main__":
     DOCS = [json.load(open(f)) for f in INFILES]
 
     MIDS = [
-        {'u': -3.0, 'l': 2.182},
-        {'u': 1.96, 'l': 0.7}
+        {'u': -3.0, 'l': 2.182,},
+        {'u': 1.96, 'l': 0.7,},
+        {'u': '2024Q2', 'l': 'All_Region', 'tag': 'spline_',},
+        {'u': '2024Q2', 'l': 'All_Region', 'tag': 'normal_',},
     ]
 
     BEST = {
