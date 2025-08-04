@@ -3,7 +3,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_area_auto_adjustable
 
 
-def plot(plots, show=False, save=None, figsize=(16*0.5, 9*0.5), xlabel=None, ylabel=None, title=None, dpi=480, xlim=None, ylim=None, padding=0.75, xticks=None, yticks=None, style=None):
+def plot(plots, show=False, save=None, figsize=(16*0.5, 9*0.5), xlabel=None, ylabel=None, title=None, dpi=480, xlim=None, ylim=None, padding=0.75, xticks=None, yticks=None, style=None, logscale=''):
     pl.close()
 
     if style is not None:
@@ -134,6 +134,11 @@ def plot(plots, show=False, save=None, figsize=(16*0.5, 9*0.5), xlabel=None, yla
             if len(p)>=4:
                 kwargs = p[3]
             pl.errorbar(x, y, **kwargs)
+
+    if 'x' in logscale.lower():
+        pl.xscale('log')
+    if 'y' in logscale.lower():
+        pl.yscale('log')
 
     if title is not None:
         pl.title(title)

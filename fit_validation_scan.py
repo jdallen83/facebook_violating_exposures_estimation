@@ -177,11 +177,14 @@ YOUTUBE_LS = [
     L_MEAN_YT,
     L_MEAN_YT + L_STD_YT,
 ]
+YOUTUBE_LS = [L_MEAN_YT] # Limiting to just most interesting for now for speed purposes...
 YOUTUBE_LS = [round(l, 3) for l in YOUTUBE_LS]
 
 TIKTOK_US = [U_MEAN - 1.5 * U_STD, U_MEAN, U_MEAN + U_STD]
+TIKTOK_US = [U_MEAN] # Limiting to just most interesting for now for speed purposes...
 TIKTOK_US = [round(u, 3) for u in TIKTOK_US]
 TIKTOK_LS = [L_MEAN - L_STD, L_MEAN, L_MEAN + 1.5 * L_STD]
+TIKTOK_LS = [L_MEAN] # Limiting to just most interesting for now for speed purposes...
 TIKTOK_LS = [round(l, 3) for l in TIKTOK_LS]
 
 N_EXTRA_BINS = [0, 1, 2, 3]
