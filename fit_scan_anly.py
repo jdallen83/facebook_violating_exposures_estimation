@@ -97,6 +97,7 @@ def plot_est_true(docs, label, dir):
 
 
 def plot_dep_key_behavior(ul, filter_doc, docs, dep_key, dep_key_label, label, fit_type, dir):
+    print("\t", dep_key)
     cur_params = dict(ul)
     cur_params.update({k: v for k, v in filter_doc.items() if k!=dep_key})
 
@@ -168,8 +169,22 @@ if __name__=="__main__":
     ]
 
     BEST = {
-        'n_extra_bins': 1,
+        'n_extra_bins': 0,
         'hist_bin_width': 0.1,
+        'x_hist_max': 9.0,
+        'rounding': 12,
+    }
+
+    BEST05 = {
+        'n_extra_bins': 0,
+        'hist_bin_width': 0.5,
+        'x_hist_max': 9.0,
+        'rounding': 12,
+    }
+
+    BEST10 = {
+        'n_extra_bins': 0,
+        'hist_bin_width': 1.0,
         'x_hist_max': 9.0,
         'rounding': 12,
     }
@@ -206,20 +221,57 @@ if __name__=="__main__":
     tt_docs = [d for d in DOCS if comp_doc(d['run_params'], ACTUAL_TT)]
     fb_docs = [d for d in DOCS if comp_doc(d['run_params'], ACTUAL_FB)]
     best_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST)]
+    best05_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST05)]
+    best10_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST10)]
     mid_docs = [[d for d in DOCS if comp_doc(d['run_params'], mid)] for mid in MIDS]
 
-    print("Plotting YouTube")
-    plot_est_true(yt_docs, 'YouTube', PLOT_DIR)
-    plot_dep_key_estimates(MIDS, ACTUAL_YT, DOCS, 'YouTube', PLOT_DIR)
+    for m in MIDS:
+        print(m)
+        print("\tYT", len([d for d in yt_docs if comp_doc(d['run_params'], m)]))
+        print("\tTT", len([d for d in tt_docs if comp_doc(d['run_params'], m)]))
+        print("\tFB", len([d for d in fb_docs if comp_doc(d['run_params'], m)]))
+        print("\tB01", len([d for d in best_docs if comp_doc(d['run_params'], m)]))
+        print("\tB05", len([d for d in best05_docs if comp_doc(d['run_params'], m)]))
+        print("\tB10", len([d for d in best10_docs if comp_doc(d['run_params'], m)]))
 
-    print("Plotting TikTok")
-    plot_est_true(tt_docs, 'TikTok', PLOT_DIR)
-    plot_dep_key_estimates(MIDS, ACTUAL_TT, DOCS, 'TikTok', PLOT_DIR)
+    try:
+        print("Plotting YouTube")
+        plot_est_true(yt_docs, 'YouTube', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, ACTUAL_YT, DOCS, 'YouTube', PLOT_DIR)
+    except:
+        print("FAILED")
 
-    print("Plotting Facebook")
-    plot_est_true(fb_docs, 'Facebook', PLOT_DIR)
-    plot_dep_key_estimates(MIDS, ACTUAL_FB, DOCS, 'Facebook', PLOT_DIR)
+    try:
+        print("Plotting TikTok")
+        plot_est_true(tt_docs, 'TikTok', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, ACTUAL_TT, DOCS, 'TikTok', PLOT_DIR)
+    except:
+        print("FAILED")
 
-    print("Plotting Ideal Params")
-    plot_est_true(best_docs, 'Ideal', PLOT_DIR)
-    plot_dep_key_estimates(MIDS, BEST, DOCS, 'Ideal', PLOT_DIR)
+    try:
+        print("Plotting Facebook")
+        plot_est_true(fb_docs, 'Facebook', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, ACTUAL_FB, DOCS, 'Facebook', PLOT_DIR)
+    except:
+        print("FAILED")
+
+    try:
+        print("Plotting Ideal Params")
+        plot_est_true(best_docs, 'Ideal', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, BEST, DOCS, 'Ideal', PLOT_DIR)
+    except:
+        print("FAILED")
+
+    try:
+        print("Plotting Ideal Params (0.5)")
+        plot_est_true(best05_docs, 'Ideal-0.5', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, BEST, DOCS, 'Ideal-0.5', PLOT_DIR)
+    except:
+        print("FAILED")
+
+    try:
+        print("Plotting Ideal Params (1.0)")
+        plot_est_true(best10_docs, 'Ideal-1.0', PLOT_DIR)
+        plot_dep_key_estimates(MIDS, BEST, DOCS, 'Ideal-1.0', PLOT_DIR)
+    except:
+        print("FAILED")
