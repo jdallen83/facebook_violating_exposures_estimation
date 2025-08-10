@@ -83,10 +83,10 @@ def histogram_samples(samples, hist_bin_width, x_hist_max, rounding):
 
 
 def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None, tag=None, correct_n_extra_bins_for_0_truncation=False):
-    cache_file = "SIM_{}{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
+    cache_file = "SIM_{}{}_{}_{}_{}_{}_{}_{}_{}_{}{}.json".format(
         tag or '', u, l, x_min, x_max, x_hist_max,
         hist_bin_width, n_hist_samples,
-        n_extra_bins, rounding, '' if not correct_n_extra_bins_for_0_truncation else '_trunc_cor'
+        n_extra_bins, rounding, '_trunc_cor' if correct_n_extra_bins_for_0_truncation else ''
     )
 
     if cache_dir is not None and os.path.isfile(os.path.join(cache_dir, cache_file)):
