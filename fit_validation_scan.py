@@ -178,7 +178,7 @@ def manual_x_y_from_fitdata(infile, fit_type='spline'):
 def get_manual_runs(infiles, runs, fit_type='spline'):
     MANUAL_RUNS = []
     for infile in infiles:
-        manual_x, manual_y = manual_x_y_from_fitdata(infile)
+        manual_x, manual_y = manual_x_y_from_fitdata(infile, fit_type=fit_type)
         for run in runs:
             r = dict(run)
             r['u'] = infile.split('[')[-1].split('-')[0]
