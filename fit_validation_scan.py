@@ -238,9 +238,9 @@ for rounding in ROUNDING:
             for bin_max_offset in [-1.0, 0.0, 1.0, 2.0]:
                 bin_max = sample_x_max - bin_max_offset
                 if bin_max_offset>0.0:
-                    n_extra_bins = bin_max_offset / bin_width
+                    n_extra_bins = round(bin_max_offset / bin_width)
                 else:
-                    n_extra_bins = 0.0
+                    n_extra_bins = 0
                 MATCH_RUNS.append({
                     'n_extra_bins': n_extra_bins,
                     'bin_width': bin_width,
