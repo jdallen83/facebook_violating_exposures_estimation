@@ -72,8 +72,9 @@ def plot_est_true(docs, label, dir):
             title='Estimated Avg. Views vs. True Avg. Views ({} Parameters)'.format(label),
             ylabel='Estimates Avg. Views',
             xlabel='True Avg. Views',
-            xlim=[0, None],
-            ylim=[0, None],
+            xlim=[20, None],
+            ylim=[20, None],
+            logscale='xy',
             padding=0.6,
             save=os.path.join(dir, 'est_vs_true_{}_params_{}.png'.format(label.lower().replace(' ', '_'), fit_type.lower())),
         )
@@ -218,15 +219,21 @@ if __name__=="__main__":
     }
 
     yt_docs = [d for d in DOCS if comp_doc(d['run_params'], ACTUAL_YT)]
+    print("Found {} YT docs".format(len(yt_docs)))
     tt_docs = [d for d in DOCS if comp_doc(d['run_params'], ACTUAL_TT)]
+    print("Found {} TT docs".format(len(yt_docs)))
     fb_docs = [d for d in DOCS if comp_doc(d['run_params'], ACTUAL_FB)]
+    print("Found {} FB docs".format(len(yt_docs)))
     best_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST)]
+    print("Found {} Ideal-0.1 docs".format(len(yt_docs)))
     best05_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST05)]
+    print("Found {} Ideal-0.5 docs".format(len(yt_docs)))
     best10_docs = [d for d in DOCS if comp_doc(d['run_params'], BEST10)]
+    print("Found {} Ideal-1.0 docs".format(len(yt_docs)))
     mid_docs = [[d for d in DOCS if comp_doc(d['run_params'], mid)] for mid in MIDS]
 
-    for m in MIDS:
-        print(m)
+    for i, m in enumerate(MIDS):
+        print(m, len(mid_docs[i]))
         print("\tYT", len([d for d in yt_docs if comp_doc(d['run_params'], m)]))
         print("\tTT", len([d for d in tt_docs if comp_doc(d['run_params'], m)]))
         print("\tFB", len([d for d in fb_docs if comp_doc(d['run_params'], m)]))

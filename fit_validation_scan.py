@@ -22,18 +22,7 @@ L_MEAN_YT = 2.182037045531944
 L_STD_YT = 0.1261763156535121
 
 
-def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None, tag=None):
-    cache_file = "SIM_{}{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
-        tag or '', u, l, x_min, x_max, x_hist_max,
-        hist_bin_width, n_hist_samples,
-        n_extra_bins, rounding,
-    )
-
-    if cache_dir is not None and os.path.isfile(os.path.join(cache_dir, cache_file)):
-        return json.load(open(os.path.join(cache_dir, cache_file)))
-
-    print(cache_file)
-
+def generate_samples(u, l, x_min, x_max, n_hist_samples, manual_x=None, manual_y=None):
     xs = None
     ys = None
     if manual_x is None or manual_y is None:
@@ -59,6 +48,10 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     samples = np.random.choice(x_sels, p=ys_norm, size=n_hist_samples)
     avg = sum(10**samples) * 1.0 / n_hist_samples
 
+    return xs, ys, samples, avg
+
+
+def histogram_samples(samples, hist_bin_width, x_hist_max, rounding):
     x_bins = []
     x = hist_bin_width / 2.0
     bins_for_np = []
@@ -86,7 +79,35 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
     hist_rounded = [round(y, rounding) for y in hist_normed]
     hist_uncert = [5 * 10**(-1 * (rounding + 1)) for y in hist_rounded]
 
-    fit = df.estimate_views_of_histogram(x_bins, hist_rounded, hist_uncert, n=100, n_samples=15000, n_extra_bins=n_extra_bins, zero_frac=0.0)
+    return x_bins, hist_rounded, hist_uncert
+
+
+def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_samples, rounding, n_extra_bins, manual_x=None, manual_y=None, cache_dir=None, tag=None, correct_n_extra_bins_for_0_truncation=False):
+    cache_file = "SIM_{}{}_{}_{}_{}_{}_{}_{}_{}_{}.json".format(
+        tag or '', u, l, x_min, x_max, x_hist_max,
+        hist_bin_width, n_hist_samples,
+        n_extra_bins, rounding, '' if not correct_n_extra_bins_for_0_truncation else '_trunc_cor'
+    )
+
+    if cache_dir is not None and os.path.isfile(os.path.join(cache_dir, cache_file)):
+        return json.load(open(os.path.join(cache_dir, cache_file)))
+
+    print(cache_file)
+
+    xs, ys, samples, avg = generate_samples(u, l, x_min, x_max, n_hist_samples, manual_x=manual_x, manual_y=manual_y)
+
+    x_bins, hist_rounded, hist_uncert = histogram_samples(samples, hist_bin_width, x_hist_max, rounding)
+
+    n_extra_bins_corrected = n_extra_bins
+    if correct_n_extra_bins_for_0_truncation:
+        cor_i = 0
+        hist_rounded_check = list(hist_rounded)
+        while len(hist_rounded_check)>=2 and hist_rounded_check[-2]==0.0 and hist_rounded_check[-1]==0.0:
+            cor_i += 1
+            hist_rounded_check = hist_rounded_check[:-1]
+        n_extra_bins_corrected = n_extra_bins + cor_i
+
+    fit = df.estimate_views_of_histogram(x_bins, hist_rounded, hist_uncert, n=100, n_samples=15000, n_extra_bins=n_extra_bins_corrected, zero_frac=0.0)
 
     r_doc = {
         'true_average': avg,
@@ -109,6 +130,7 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
             'manual_x': manual_x,
             'manual_y': manual_y,
             'tag': tag,
+            'correct_n_extra_bins_for_0_truncation': correct_n_extra_bins_for_0_truncation,
         }
     }
 
@@ -121,22 +143,23 @@ def fit_simulation_run(u, l, x_min, x_max, x_hist_max, hist_bin_width, n_hist_sa
 def fit_simulation_run_wrap(doc, cache_dir=None):
     if 'status_print' in doc:
         print(doc['status_print'])
-    try:
-        return fit_simulation_run(
-            doc['u'], doc['l'],
-            0.0, doc['sample_x_max'],
-            doc['bin_max'], doc['bin_width'],
-            doc.get('n_hist_samples', 300000000),
-            doc['rounding'], doc['n_extra_bins'],
-            cache_dir=doc.get('cache_dir', cache_dir),
-            manual_x=doc.get('manual_x', None),
-            manual_y=doc.get('manual_y', None),
-            tag=doc.get('tag', None),
-        )
-    except:
-        print("FAILURE")
-        print(json.dumps(doc, indent=2))
-        return None
+    #try:
+    return fit_simulation_run(
+        doc['u'], doc['l'],
+        0.0, doc['sample_x_max'],
+        doc['bin_max'], doc['bin_width'],
+        doc.get('n_hist_samples', 300000000),
+        doc['rounding'], doc['n_extra_bins'],
+        cache_dir=doc.get('cache_dir', cache_dir),
+        manual_x=doc.get('manual_x', None),
+        manual_y=doc.get('manual_y', None),
+        tag=doc.get('tag', None),
+        correct_n_extra_bins_for_0_truncation=doc.get('correct_n_extra_bins_for_0_truncation', False),
+    )
+#    except:
+#        print("FAILURE")
+#        print(json.dumps(doc, indent=2))
+#        return None
 
 
 def manual_x_y_from_fitdata(infile, fit_type='spline'):
@@ -172,16 +195,19 @@ def get_manual_runs(infiles, runs, fit_type='spline'):
 
 
 YOUTUBE_US = [-3.0]
-YOUTUBE_LS = [
-    L_MEAN_YT - L_STD_YT,
-    L_MEAN_YT,
-    L_MEAN_YT + L_STD_YT,
-]
+#YOUTUBE_LS = [
+#    L_MEAN_YT - L_STD_YT,
+#    L_MEAN_YT,
+#    L_MEAN_YT + L_STD_YT,
+#]
+YOUTUBE_LS = [L_MEAN_YT]
 YOUTUBE_LS = [round(l, 3) for l in YOUTUBE_LS]
 
-TIKTOK_US = [U_MEAN - 1.5 * U_STD, U_MEAN, U_MEAN + U_STD]
+#TIKTOK_US = [U_MEAN - 1.5 * U_STD, U_MEAN, U_MEAN + U_STD]
+TIKTOK_US = [U_MEAN]
 TIKTOK_US = [round(u, 3) for u in TIKTOK_US]
-TIKTOK_LS = [L_MEAN - L_STD, L_MEAN, L_MEAN + 1.5 * L_STD]
+#TIKTOK_LS = [L_MEAN - L_STD, L_MEAN, L_MEAN + 1.5 * L_STD]
+TIKTOK_LS = [L_MEAN]
 TIKTOK_LS = [round(l, 3) for l in TIKTOK_LS]
 
 N_EXTRA_BINS = [0, 1, 2, 3, 4]
@@ -204,6 +230,28 @@ for n_extra_bins in N_EXTRA_BINS:
                         'sample_x_max': sample_x_max,
                         'rounding': rounding,
                     })
+
+MATCH_RUNS = []
+for rounding in ROUNDING:
+    for bin_width in BIN_WIDTHS:
+        for sample_x_max in [5.0, 6.0, 7.0, 8.0, 9.0]:
+            for bin_max_offset in [-1.0, 0.0, 1.0, 2.0]:
+                bin_max = sample_x_max - bin_max_offset
+                if bin_max_offset>0.0:
+                    n_extra_bins = bin_max_offset / bin_width
+                else:
+                    n_extra_bins = 0.0
+                MATCH_RUNS.append({
+                    'n_extra_bins': n_extra_bins,
+                    'bin_width': bin_width,
+                    'bin_max': bin_max,
+                    'sample_x_max': sample_x_max,
+                    'rounding': rounding,
+                    'correct_n_extra_bins_for_0_truncation': True,
+                })
+
+RUNS = RUNS + MATCH_RUNS
+
 YT_RUNS = []
 for u in YOUTUBE_US:
     for l in YOUTUBE_LS:
