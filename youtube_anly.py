@@ -147,6 +147,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'], histo_filetag, label=histo_label + ' (Nor.)')
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'], histo_filetag + '_spline_', label=histo_label + ' (Spl.)')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['smooth_spline']['fit_bins_with_0'], fit['smooth_spline']['curves_with_0'], histo_filetag + '_smoothspline_', label=histo_label + ' (Sm. Spl.)')
 #        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
 #        histo_filetag = os.path.join(plot_dir, histo_filetag)
 #        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
