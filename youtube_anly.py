@@ -147,7 +147,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'], histo_filetag, label=histo_label + ' (Nor.)')
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'], histo_filetag + '_spline_', label=histo_label + ' (Spl.)')
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['smooth_spline']['fit_bins_with_0'], fit['smooth_spline']['curves_with_0'], histo_filetag + '_smoothspline_', label=histo_label + ' (Sm. Spl.)')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['kernel']['fit_bins_with_0'], fit['kernel']['curves_with_0'], histo_filetag + '_kernel_', label=histo_label + ' (Kern.)')
 #        histo_filetag = histo_label.replace(' ', '_').replace('(', '-').replace(')', '-').replace(',', '-')
 #        histo_filetag = os.path.join(plot_dir, histo_filetag)
 #        distribution_fit.plot_estimation_from_discrete_distribution(fit['estimates_with_0'], fit['fit_bins_with_0'], fit['curves_with_0'], histo_filetag, label=histo_label)
@@ -197,8 +197,11 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
     return r
 
 
-def process_youtube_data(infile, outfile, plot_dir=None):
+def process_youtube_data(infile, outfile, plot_dir=None, quarter=None):
     df = pd.read_csv(infile, sep='\t')
+
+    if quarter is not None:
+        df = df[df.quarter==quarter]
 
     df_hist = df[df['name'].isin(VIEWS_BUCKET_MAP.keys())].copy()
     df_hist['pct'] = df_hist['value'] / 100.0
@@ -317,13 +320,19 @@ def process_youtube_data(infile, outfile, plot_dir=None):
 if __name__=='__main__':
     import sys
 
-    if len(sys.argv)!=4:
+    if len(sys.argv)<4:
         print("Usage: python youtube_anly.py [Path to extracted YouTube data csv file] [Path to desired output file]")
         sys.exit()
 
     cger_infile = sys.argv[1]
     outfile = sys.argv[2]
     plots_dir = sys.argv[3]
+
+    quarter = None
+    if len(sys.argv) > 4:
+        for arg in sys.argv[4:]:
+            if arg.startswith('--quarter='):
+                quarter = arg.replace('--quarter=', '')
 
     if not os.path.isfile(cger_infile):
         print("Provided path the csv file", cger_infile, "is not found.")
@@ -337,4 +346,4 @@ if __name__=='__main__':
         print("Plot directory needs to exist and be a directory")
         sys.exit()
 
-    df_violating_exposures = process_youtube_data(cger_infile, outfile, plot_dir=plots_dir)
+    df_violating_exposures = process_youtube_data(cger_infile, outfile, plot_dir=plots_dir, quarter=quarter)

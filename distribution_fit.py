@@ -57,7 +57,7 @@ def chi2_fit(func, x, y, e, p, relax=0.0):
     for i in range(5):
         if hess_inv is None or res_variance is None:
             fit, hess_inv, infodict, errmsg, success = sp.optimize.leastsq(error_func, fit, args=(np.array(x), np.array(y), np.array(e)), full_output=1)
-            res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y)-len(p) )
+            res_variance = (error_func(fit, np.array(x), np.array(y), np.array(e))**2).sum()/(len(y) - len(p) + relax)
         else:
             break
 
@@ -195,29 +195,37 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
     return x_spl, y_spl
 
 
-class PositiveSpline:
-    def __init__(self, x, y, min_value=0.0, derivative_limit=False):
+class GaussianKernel:
+    def __init__(self, x, y, l=0.50):
+        self.x = x
+        self.y = y
+        self.l = l
+
+    def __call__(self, xs):
+        if not isinstance(xs, np.ndarray):
+            xs = np.array(xs)
+        ys = np.array([0.0 for _ in range(len(xs))])
+
+        for x, y in zip(self.x, self.y):
+            ys = ys + y**2 * np.exp(-0.5 * (xs - x) * (xs - x) / self.l**2)
+
+        return np.array(ys)
+
+
+class PositiveLinearSpline:
+    def __init__(self, x, y, min_value=0.0):
         self.min_value = min_value
-        self.spline = sp.interpolate.make_smoothing_spline(x, y, lam=None)
-        #self.spline = sp.interpolate.make_interp_spline(x, y, k=2)
-        self.derivative_limit = False#derivative_limit
+        self.spline = sp.interpolate.make_interp_spline(x, y, k=1)
 
     def __call__(self, xs):
         ys = np.maximum(self.spline(xs), self.min_value)
 
-        if self.derivative_limit:
-            pos_derivative_zeros = 0
-            while ys[-1] > ys[-2] and pos_derivative_zeros < 90:
-                pos_derivative_zeros += 1
-                ys = ys[:-1]
-            ys = list(ys) + [0.0 for _ in range(pos_derivative_zeros)]
         return np.array(ys)
 
 
-
-def spline_area_fitting_func(x, y, n_extra_bins=1, n_bins=100):
+def curve_area_fitting_func(x, y, class_type=GaussianKernel, n_extra_bins=1, n_bins=100):
     d = x[1] - x[0]
-    spline = PositiveSpline(list(x), list(y), derivative_limit=True)
+    spline = class_type(list(x), list(y))
 
     s = d * 1.0 / n_bins
 
@@ -245,81 +253,55 @@ def spline_area_fitting_func(x, y, n_extra_bins=1, n_bins=100):
     return return_ys
 
 
-def fit_histogram_with_smooth_spline(xs, ys, es, n_extra_bins=1, n=100):
+def fit_histogram_with_kernel(xs, ys, es, n_extra_bins=1, n=100):
     width = xs[1] - xs[0]
     xs_spl = list(xs)
     ys_spl = list(ys)
     es_spl = list(es)
 
-    #if ys_spl[1]!=0.0:
-    #    r = ((ys_spl[0] / ys_spl[1]) - 1.0) / 2.0 + 1.0
-    #else:
-    #    r = 1.0
+    x_spl = []
+    y_spl = []
+    spl = None
 
-    #xs_spl.insert(0, xs_spl[0] - width / 2.0)
-    #ys_spl.insert(0, ys_spl[0] * r)
-    #es_spl.insert(0, es_spl[0] * r)
+    try:
+        fit_p, fit_cov = chi2_fit(lambda x, p: curve_area_fitting_func(x, p, n_extra_bins=n_extra_bins, n_bins=n), xs_spl, ys_spl, es_spl, np.sqrt(np.array(ys_spl)), relax=1.0)
+        spl = GaussianKernel(xs_spl, fit_p)
+    except:
+        print("Failed to fit spline")
+        print(xs_spl)
+        print(ys_spl)
+        raise ValueError
 
-    xs_spl.append(xs_spl[-1] + (n_extra_bins + 0.5) * width)
-    ys_spl.append(0.0)
-    es_spl.append(es_spl[-1] / 10.0)
+    x_spl = np.linspace(0, xs[-1] + width * (n_extra_bins + 0.5), num=n * (len(xs) + n_extra_bins), endpoint=False)
+    y_spl = spl(x_spl)
 
-    #while xs_spl[0] >= 0.5:
-    #    xs_spl.insert(0, xs_spl[0] - width / 2.0)
-    #    ys_spl.insert(0, ys_spl[0] * r)
-    #    es_spl.insert(0, es_spl[0] * r)
+    x_spl = list([float(x) for x in x_spl])
+    y_spl = list([float(y) for y in y_spl])
+
+    return x_spl, y_spl
 
 
-    #min_x_for_zero = -1.0
-    #for x, y in zip(xs_spl, ys_spl):
-    #    if y > 0.0:
-    #        break
-    #    min_x_for_zero = x + width
+def fit_histogram_with_linear_spline(xs, ys, es, n_extra_bins=1, n=100):
+    width = xs[1] - xs[0]
+    xs_spl = list(xs)
+    ys_spl = list(ys)
+    es_spl = list(es)
 
     x_spl = []
     y_spl = []
     spl = None
 
-    redo = True
-    while redo:
-        redo = False
+    try:
+        fit_p, fit_cov = chi2_fit(lambda x, p: curve_area_fitting_func(x, p, class_type=PositiveLinearSpline, n_extra_bins=n_extra_bins, n_bins=n), xs_spl, ys_spl, es_spl, np.sqrt(np.array(ys_spl)), relax=1.0)
+        spl = PositiveLinearSpline(xs_spl, fit_p)
+    except:
+        print("Failed to fit spline")
+        print(xs_spl)
+        print(ys_spl)
+        raise ValueError
 
-        try:
-            #spl = sp.interpolate.make_interp_spline(xs_spl, ys_spl, bc_type="clamped", k=3)
-            fit_p, fit_cov = chi2_fit(lambda x, p: spline_area_fitting_func(x, p, n_extra_bins=n_extra_bins, n_bins=n), xs_spl, ys_spl, es_spl, ys_spl, relax=1.0)
-            spl = PositiveSpline(xs_spl, fit_p, min_value=0.0, derivative_limit=True)
-        except:
-            print("Failed to fit spline")
-            print(xs_spl)
-            print(ys_spl)
-            raise ValueError
-
-        x_spl = np.linspace(0, xs[-1] + width * (n_extra_bins + 0.5), num=n * (len(xs) + n_extra_bins), endpoint=False)
-        y_spl = spl(x_spl)
-
-        x_spl = [float(x) for x in x_spl]
-        y_spl = [float(y) for y in y_spl]
-
-        #for x, y in zip(x_spl, y_spl):
-        #    if y < 0 and x < xs_spl[-2] and x >= min_x_for_zero:
-        #        try:
-        #            x_l = max([xx for xx in xs_spl if xx <= x])
-        #            x_r = min([xx for xx in xs_spl if xx > x])
-        #        except:
-        #            print(xs_spl)
-        #            print(x)
-        #            raise ValueError
-        #        y_l = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
-        #        y_r = [yy for xx, yy in zip(xs_spl, ys_spl) if xx==x_l][0]
-        #        if y_l==0.0 and y_r==0.0:
-        #            break
-        #        i = [ii for ii, xx in enumerate(xs_spl) if xx==x_r][0]
-        #        xs_spl.insert(i, 0.5 * (x_l + x_r))
-        #        ys_spl.insert(i, 0.5 * (y_l + y_r))
-        #        redo = True
-        #        break
-
-        #y_spl = np.maximum(y_spl, 0.0)
+    x_spl = np.linspace(0, xs[-1] + width * (n_extra_bins + 0.5), num=n * (len(xs) + n_extra_bins), endpoint=False)
+    y_spl = spl(x_spl)
 
     x_spl = list([float(x) for x in x_spl])
     y_spl = list([float(y) for y in y_spl])
@@ -649,9 +631,9 @@ def estimate_views_of_histogram(xs, ys, es, n=100, n_samples=1000, n_extra_bins=
 
     normal_dist_fit = estimate_views_using_model(xs, fit_ys, fit_es, fit_histogram_with_normal, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
 
-    spline_dist_fit = estimate_views_using_model(xs, fit_ys, fit_es, fit_histogram_with_spline, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
+    spline_dist_fit = estimate_views_using_model(xs, fit_ys, fit_es, fit_histogram_with_linear_spline, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
 
-    smooth_spline_dist_fit = estimate_views_using_model(xs, fit_ys, fit_es, fit_histogram_with_smooth_spline, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
+    kernel_dist_fit = estimate_views_using_model(xs, fit_ys, fit_es, fit_histogram_with_kernel, n=n, n_samples=n_samples, n_extra_bins=n_extra_bins, zero_frac=zero_frac)
 
     sampled_ys = regenerate_distribution_within_errors(xs, fit_ys, fit_es, n=n_samples)
     data_fit_bins = data_views(xs, fit_ys, fit_es, sampled_ys, zero_frac=zero_frac)
@@ -672,17 +654,17 @@ def estimate_views_of_histogram(xs, ys, es, n=100, n_samples=1000, n_extra_bins=
             max([spline_dist_fit['estimate'][0] - spline_dist_fit['estimate'][1], 0.0]),
             spline_dist_fit['estimate'][0],
             spline_dist_fit['estimate'][0] + spline_dist_fit['estimate'][1]
-        )
-        'Modeled (Smooth Spline)': (
-            max([smooth_spline_dist_fit['estimate'][0] - smooth_spline_dist_fit['estimate'][1], 0.0]),
-            smooth_spline_dist_fit['estimate'][0],
-            smooth_spline_dist_fit['estimate'][0] + smooth_spline_dist_fit['estimate'][1]
+        ),
+        'Modeled (Kernel)': (
+            max([kernel_dist_fit['estimate'][0] - kernel_dist_fit['estimate'][1], 0.0]),
+            kernel_dist_fit['estimate'][0],
+            kernel_dist_fit['estimate'][0] + kernel_dist_fit['estimate'][1]
         )
     }
 
     fit = {
         'spline': spline_dist_fit,
-        'smooth_spline': smooth_spline_dist_fit,
+        'kernel': kernel_dist_fit,
         'normal': normal_dist_fit,
         'data': data_fit_bins,
         'estimates': estimates,

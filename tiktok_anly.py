@@ -145,7 +145,7 @@ def get_average_views(df_histo, method='linear', plot_dir=None, histo_label=None
         histo_filetag = os.path.join(plot_dir, histo_filetag)
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['normal']['fit_bins_with_0'], fit['normal']['curves_with_0'], histo_filetag, label=histo_label + ' (Nor.)')
         distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['spline']['fit_bins_with_0'], fit['spline']['curves_with_0'], histo_filetag + '_spline_', label=histo_label + ' (Spl.)')
-        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['smooth_spline']['fit_bins_with_0'], fit['smooth_spline']['curves_with_0'], histo_filetag + '_smoothspline_', label=histo_label + ' (Sm. Spl.)')
+        distribution_fit.plot_estimation_from_discrete_distribution(fit['data_with_0'], fit['estimates_with_0'], fit['kernel']['fit_bins_with_0'], fit['kernel']['curves_with_0'], histo_filetag + '_kernel_', label=histo_label + ' (Kern.)')
 
     r = {
         'lower_bound': low_limit,
@@ -198,7 +198,7 @@ def period_to_quarter(p):
     return "{}{}".format(y, q)
 
 
-def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir=None):
+def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir=None, quarter=None):
     with open(infile + '__ampersand_fix.csv', 'w') as f:
         data = open(infile).read().replace(' and ', ' & ')
         f.write(data)
@@ -210,6 +210,8 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
         df = df[df.Market==market].copy()
     if period is not None:
         df = df[df.Period==period].copy()
+    if quarter is not None:
+        df = df[df.quarter==quarter].copy()
 
     df_hist = df[(df['Task type']=='Share of total removals')].copy()
 
@@ -304,13 +306,22 @@ def process_tiktok_data(infile, outfile=None, market=None, period=None, plot_dir
 if __name__=='__main__':
     import sys
 
-    if len(sys.argv)!=4:
+    if len(sys.argv)<4:
         print("Usage: python tiktok_anly.py [Path to CSER csv file] [Path to desired output file]")
         sys.exit()
 
     cger_infile = sys.argv[1]
     outfile = sys.argv[2]
     plot_dir = sys.argv[3]
+
+    market = None
+    quarter = None
+    if len(sys.argv) > 4:
+        for arg in sys.argv[4:]:
+            if arg.startswith('--market='):
+                market = arg.replace('--market=', '')
+            elif arg.startswith('--quarter='):
+                quarter = arg.replace('--quarter=', '')
 
     if not os.path.isfile(cger_infile):
         print("Provided path the CGER csv file", cger_infile, "is not found.")
@@ -320,4 +331,4 @@ if __name__=='__main__':
         print("Provided output file", outfile, "exists. Will not overwrite.")
         sys.exit()
 
-    df_violating_exposures = process_tiktok_data(cger_infile, outfile, plot_dir=plot_dir)
+    df_violating_exposures = process_tiktok_data(cger_infile, outfile, plot_dir=plot_dir, market=market, quarter=quarter)
