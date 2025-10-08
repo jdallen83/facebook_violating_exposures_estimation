@@ -196,7 +196,7 @@ def fit_histogram_with_spline(xs, ys, es, n_extra_bins=1, n=100):
 
 
 class GaussianKernel:
-    def __init__(self, x, y, l=0.50):
+    def __init__(self, x, y, l=0.50, **kwargs):
         self.x = x
         self.y = y
         self.l = l
@@ -213,19 +213,27 @@ class GaussianKernel:
 
 
 class PositiveLinearSpline:
-    def __init__(self, x, y, min_value=0.0):
+    def __init__(self, x, y, min_value=0.0, zero_after_first_zero_bins=None, **kwargs):
         self.min_value = min_value
         self.spline = sp.interpolate.make_interp_spline(x, y, k=1)
+        self.zero_after_first_zero_bins = zero_after_first_zero_bins
 
     def __call__(self, xs):
         ys = np.maximum(self.spline(xs), self.min_value)
 
+        if self.zero_after_first_zero_bins is not None and ys[-1] > 0.0 and 0.0 in ys[-1*self.zero_after_first_zero_bins:]:
+            for i in range(self.zero_after_first_zero_bins):
+                ii = self.zero_after_first_zero_bins - i
+                if ys[-1 * ii] == 0.0:
+                    ys[-1 * ii:] = 0.0
+                    break
+
         return np.array(ys)
 
 
-def curve_area_fitting_func(x, y, class_type=GaussianKernel, n_extra_bins=1, n_bins=100):
+def curve_area_fitting_func(x, y, class_type=GaussianKernel, n_extra_bins=1, n_bins=100, **kwargs):
     d = x[1] - x[0]
-    spline = class_type(list(x), list(y))
+    spline = class_type(list(x), list(y), **kwargs)
 
     s = d * 1.0 / n_bins
 
@@ -292,8 +300,8 @@ def fit_histogram_with_linear_spline(xs, ys, es, n_extra_bins=1, n=100):
     spl = None
 
     try:
-        fit_p, fit_cov = chi2_fit(lambda x, p: curve_area_fitting_func(x, p, class_type=PositiveLinearSpline, n_extra_bins=n_extra_bins, n_bins=n), xs_spl, ys_spl, es_spl, np.sqrt(np.array(ys_spl)), relax=1.0)
-        spl = PositiveLinearSpline(xs_spl, fit_p)
+        fit_p, fit_cov = chi2_fit(lambda x, p: curve_area_fitting_func(x, p, class_type=PositiveLinearSpline, n_extra_bins=n_extra_bins, n_bins=n, zero_after_first_zero_bins=n*n_extra_bins), xs_spl, ys_spl, es_spl, np.sqrt(np.array(ys_spl)), relax=1.0)
+        spl = PositiveLinearSpline(xs_spl, fit_p, zero_after_first_zero_bins=n*n_extra_bins)
     except:
         print("Failed to fit spline")
         print(xs_spl)
